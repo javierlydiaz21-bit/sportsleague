@@ -367,7 +367,10 @@ npm run start:dev
   Vercel con su integración de GitHub (preview por Pull Request). Variables en Vercel:
   `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`, `API_INTERNAL_URL`.
 - `render.yaml`: blueprint de referencia con los 10 servicios (gateway y Live Score públicos, el
-  resto privados), 9 bases de datos y Redis (Key Value).
+  resto privados), 9 bases de datos y Redis (Key Value). Requiere planes de pago de Render: el
+  plan gratuito no incluye servicios privados ni varias bases PostgreSQL. Por eso no está
+  desplegado; la plataforma se demuestra en local con Docker Compose, y GitHub Actions publica
+  igualmente las imágenes en GHCR (el paso de despliegue se omite sin los secretos de Render).
 - Flujo Git: `feature/*` → `develop` → `main`, `hotfix/*` desde `main`; PR con revisión y checks en verde.
 
 ---

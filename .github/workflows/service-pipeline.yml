@@ -115,7 +115,9 @@ jobs:
   deploy:
     name: Despliegue en Render (rolling update)
     needs: image
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Sin una función de estado, GitHub aplica success() implícito sobre TODOS los jobs anteriores,
+    # y el job de k6 (que solo corre en Live Score) queda "skipped": el despliegue se saltaría.
+    if: ${{ !cancelled() && needs.image.result == 'success' && github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
