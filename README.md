@@ -355,8 +355,10 @@ npm run start:dev
 
 - `.github/workflows/<servicio>.yml`: se dispara solo cuando cambia ese servicio y llama a
   `service-pipeline.yml`: **npm ci → ESLint → Jest (con cobertura) → build → (k6 en Live Score)
-  → imagen Docker publicada en GHCR** (`ghcr.io/<owner>/sportsleague-<servicio>:<sha>`) →
-  **despliegue en Render** con rolling update (solo en `main`).
+  → imagen Docker publicada en GHCR** (`ghcr.io/<owner>/sportsleague-app-<servicio>:<sha>`) →
+  **despliegue en Render** con rolling update (solo en `main`). El prefijo `sportsleague-app-`
+  evita chocar con los paquetes `sportsleague-<servicio>` del proyecto anterior (`sportsleague-ms`),
+  en los que este repositorio no tiene permiso de escritura.
 - Secretos por servicio: `RENDER_DEPLOY_HOOK_<SERVICIO>` (p. ej. `RENDER_DEPLOY_HOOK_LIVE_SCORE`).
   Sin el secreto, el despliegue se omite sin fallar.
 - **Rollback**: volver a desplegar en Render la imagen de un `sha` anterior (todas quedan versionadas en GHCR).

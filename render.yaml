@@ -2,8 +2,8 @@
 # en GHCR (publicada por GitHub Actions) con su propia base de datos PostgreSQL.
 #
 # Antes de usarlo:
-#   1. Las imágenes apuntan a ghcr.io/javierlydiaz21-bit (dueño del repositorio, en minúsculas);
-#      si el repositorio cambia de dueño, actualiza esa ruta en todas las líneas "image".
+#   1. Las imágenes son ghcr.io/javierlydiaz21-bit/sportsleague-app-<servicio> (dueño del repositorio,
+#      en minúsculas); si el repositorio cambia de dueño, actualiza esa ruta en todas las líneas "image".
 #   2. Crea en Render las credenciales de registro "ghcr" (usuario de GitHub + token con read:packages).
 #   3. Revisa planes y región en el dashboard; los valores marcados `sync: false` se piden al aplicar.
 #
@@ -33,7 +33,7 @@ services:
     name: sportsleague-api-gateway
     runtime: image
     image:
-      url: ghcr.io/javierlydiaz21-bit/sportsleague-api-gateway:latest
+      url: ghcr.io/javierlydiaz21-bit/sportsleague-app-api-gateway:latest
       creds:
         fromRegistryCreds:
           name: ghcr
@@ -71,7 +71,7 @@ services:
   - type: pserv
     name: sportsleague-auth-service
     runtime: image
-    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-auth-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-auth-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
     plan: starter
     envVars:
       - fromGroup: sportsleague-shared
@@ -95,7 +95,7 @@ services:
   - type: pserv
     name: sportsleague-league-service
     runtime: image
-    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-league-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-league-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
     plan: starter
     envVars:
       - fromGroup: sportsleague-shared
@@ -109,7 +109,7 @@ services:
   - type: pserv
     name: sportsleague-team-service
     runtime: image
-    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-team-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-team-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
     plan: starter
     envVars:
       - fromGroup: sportsleague-shared
@@ -125,7 +125,7 @@ services:
   - type: pserv
     name: sportsleague-fixture-service
     runtime: image
-    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-fixture-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-fixture-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
     plan: starter
     envVars:
       - fromGroup: sportsleague-shared
@@ -143,7 +143,7 @@ services:
   - type: pserv
     name: sportsleague-referee-service
     runtime: image
-    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-referee-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-referee-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
     plan: starter
     envVars:
       - fromGroup: sportsleague-shared
@@ -157,7 +157,7 @@ services:
   - type: web
     name: sportsleague-live-score-service
     runtime: image
-    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-live-score-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-live-score-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
     plan: starter
     healthCheckPath: /health
     envVars:
@@ -180,7 +180,7 @@ services:
   - type: pserv
     name: sportsleague-statistics-service
     runtime: image
-    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-statistics-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-statistics-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
     plan: starter
     envVars:
       - fromGroup: sportsleague-shared
@@ -198,7 +198,7 @@ services:
   - type: pserv
     name: sportsleague-notification-service
     runtime: image
-    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-notification-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-notification-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
     plan: starter
     envVars:
       - fromGroup: sportsleague-shared
@@ -214,7 +214,7 @@ services:
   - type: pserv
     name: sportsleague-analytics-service
     runtime: image
-    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-analytics-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-analytics-service:latest, creds: { fromRegistryCreds: { name: ghcr } } }
     plan: starter
     envVars:
       - fromGroup: sportsleague-shared

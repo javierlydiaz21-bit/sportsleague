@@ -19,6 +19,9 @@ microservicios independientes. El README.md documenta todo; aquí van solo la es
 - `scripts/seed-demo.mjs`: demo determinista e idempotente (`docker compose --profile demo run --rm seed`).
 - `iniciar.ps1` / `iniciar.bat` / `detener.bat` / `iniciar.sh`: arranque en un clic.
 - `.github/workflows/` + `render.yaml`: CI/CD (GHCR + Render); el frontend se despliega en Vercel.
+  Repositorio: github.com/javierlydiaz21-bit/sportsleague. Imágenes:
+  `ghcr.io/javierlydiaz21-bit/sportsleague-app-<servicio>`. No uses `sportsleague-<servicio>`:
+  esos paquetes son del proyecto anterior (`sportsleague-ms`) y este repo no puede escribir en ellos.
 
 ## Arrancar y verificar
 

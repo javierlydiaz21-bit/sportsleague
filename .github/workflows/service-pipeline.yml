@@ -88,8 +88,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Prefijo "sportsleague-app-": los nombres "sportsleague-<servicio>" ya pertenecen a los
+      # paquetes del proyecto anterior (sportsleague-ms) y este repositorio no puede escribir en ellos.
       - name: Nombre de la imagen (GHCR exige minúsculas)
-        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/sportsleague-${{ inputs.service }}" >> "$GITHUB_ENV"
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/sportsleague-app-${{ inputs.service }}" >> "$GITHUB_ENV"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -125,6 +127,6 @@ jobs:
             echo "RENDER_DEPLOY_HOOK no está configurado: se omite el despliegue."
             exit 0
           fi
-          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/sportsleague-${{ inputs.service }}:${GITHUB_SHA}"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/sportsleague-app-${{ inputs.service }}:${GITHUB_SHA}"
           curl -fsS -X POST "${HOOK}&imgURL=$(jq -rn --arg v "$IMAGE" '$v|@uri')"
           echo "Render desplegará $IMAGE con rolling update (health check en /health)."
