@@ -1,0 +1,70 @@
+// Fixture Service — base de datos propia (fixture_db).
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum FixtureStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// programado, en_curso, finalizado o suspendido
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  SUSPENDED
+}
+
+/// Calendario generado para una categoría dentro de una temporada.
+model Fixture {
+  id          String        @id @default(uuid()) @db.Uuid
+  seasonId    String        @map("season_id") @db.Uuid
+  categoryId  String        @map("category_id") @db.Uuid
+  leagueId    String        @map("league_id") @db.Uuid
+  ownerId     String        @map("owner_id") @db.Uuid
+  status      FixtureStatus @default(DRAFT)
+  doubleRound Boolean       @default(false) @map("double_round")
+  totalRounds Int           @default(0) @map("total_rounds")
+  /// Parámetros con los que se generó (días de juego, descanso mínimo, duración de franja...).
+  config      Json
+  createdAt   DateTime      @default(now()) @map("created_at")
+  publishedAt DateTime?     @map("published_at")
+  matches     Match[]
+
+  @@unique([seasonId, categoryId])
+  @@map("fixtures")
+}
+
+/// Solo referencias por id a equipos y canchas (sin duplicar nombres de otros servicios).
+model Match {
+  id               String      @id @default(uuid()) @db.Uuid
+  fixtureId        String      @map("fixture_id") @db.Uuid
+  seasonId         String      @map("season_id") @db.Uuid
+  categoryId       String      @map("category_id") @db.Uuid
+  leagueId         String      @map("league_id") @db.Uuid
+  ownerId          String      @map("owner_id") @db.Uuid
+  round            Int
+  homeTeamId       String      @map("home_team_id") @db.Uuid
+  awayTeamId       String      @map("away_team_id") @db.Uuid
+  venueId          String?     @map("venue_id") @db.Uuid
+  scheduledAt      DateTime    @map("scheduled_at")
+  status           MatchStatus @default(SCHEDULED)
+  suspensionReason String?     @map("suspension_reason")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+  fixture          Fixture     @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+
+  /// Índice crítico: consultas de calendario por fecha.
+  @@index([seasonId, scheduledAt])
+  @@index([status])
+  @@index([categoryId])
+  @@index([leagueId])
+  @@map("matches")
+}

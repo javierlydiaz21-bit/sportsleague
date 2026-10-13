@@ -1,0 +1,257 @@
+# SportsLeague — entorno local completo.
+#   docker compose up --build          → plataforma + observabilidad
+#   http://localhost:3000              → web (organizadores, árbitros, aficionados y admin)
+#   http://localhost:4000              → API Gateway (único punto de entrada HTTP)
+#   http://localhost:3100              → Grafana (admin / admin)
+#
+# Solo el gateway, el canal WebSocket del Live Score Service y el frontend publican
+# puertos: el resto de microservicios y las bases de datos viven en la red privada.
+name: sportsleague
+
+x-node-env: &node-env
+  NODE_ENV: production
+  REDIS_URL: redis://redis:6379
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token-change-me}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  LEAGUE_UTC_OFFSET: "-05:00"
+  LEAGUE_TIMEZONE: America/Bogota
+
+x-service: &service
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  networks: [backend]
+
+services:
+  # ---------- Infraestructura ----------
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SERVICES_DB_PASSWORD: ${SERVICES_DB_PASSWORD:-sl_dev_pass}
+      ANALYTICS_RO_PASSWORD: ${ANALYTICS_RO_PASSWORD:-sl_ro_pass}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5440:5432" # solo para inspección local con un cliente SQL
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [backend]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:6380:6379" # solo para ejecutar servicios fuera de Docker durante el desarrollo
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [backend]
+
+  # ---------- Microservicios (cada uno con su propia base de datos) ----------
+  auth-service:
+    <<: *service
+    build: ./services/auth-service
+    environment:
+      <<: *node-env
+      PORT: 4001
+      DATABASE_URL: postgresql://auth_user:${SERVICES_DB_PASSWORD:-sl_dev_pass}@postgres:5432/auth_db
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-me}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@sportsleague.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin12345}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrador}
+      COOKIE_SECURE: "false"
+      COOKIE_SAMESITE: lax
+
+  league-service:
+    <<: *service
+    build: ./services/league-service
+    environment:
+      <<: *node-env
+      PORT: 4002
+      DATABASE_URL: postgresql://league_user:${SERVICES_DB_PASSWORD:-sl_dev_pass}@postgres:5432/league_db
+
+  team-service:
+    <<: *service
+    build: ./services/team-service
+    environment:
+      <<: *node-env
+      PORT: 4003
+      DATABASE_URL: postgresql://team_user:${SERVICES_DB_PASSWORD:-sl_dev_pass}@postgres:5432/team_db
+      LEAGUE_SERVICE_URL: http://league-service:4002
+
+  fixture-service:
+    <<: *service
+    build: ./services/fixture-service
+    environment:
+      <<: *node-env
+      PORT: 4004
+      DATABASE_URL: postgresql://fixture_user:${SERVICES_DB_PASSWORD:-sl_dev_pass}@postgres:5432/fixture_db
+      LEAGUE_SERVICE_URL: http://league-service:4002
+      TEAM_SERVICE_URL: http://team-service:4003
+
+  referee-service:
+    <<: *service
+    build: ./services/referee-service
+    environment:
+      <<: *node-env
+      PORT: 4005
+      DATABASE_URL: postgresql://referee_user:${SERVICES_DB_PASSWORD:-sl_dev_pass}@postgres:5432/referee_db
+      REFEREE_MATCH_MINUTES: 120
+
+  live-score-service:
+    <<: *service
+    build: ./services/live-score-service
+    environment:
+      <<: *node-env
+      PORT: 4006
+      DATABASE_URL: postgresql://livescore_user:${SERVICES_DB_PASSWORD:-sl_dev_pass}@postgres:5432/livescore_db
+      FIXTURE_SERVICE_URL: http://fixture-service:4004
+      REFEREE_SERVICE_URL: http://referee-service:4005
+      TEAM_SERVICE_URL: http://team-service:4003
+      WS_ALLOWED_ORIGINS: ${WS_ALLOWED_ORIGINS:-http://localhost:3000}
+    ports:
+      - "4006:4006" # canal WebSocket público para espectadores y árbitros
+
+  statistics-service:
+    <<: *service
+    build: ./services/statistics-service
+    environment:
+      <<: *node-env
+      PORT: 4007
+      DATABASE_URL: postgresql://statistics_user:${SERVICES_DB_PASSWORD:-sl_dev_pass}@postgres:5432/statistics_db
+      LEAGUE_SERVICE_URL: http://league-service:4002
+      LIVE_SCORE_SERVICE_URL: http://live-score-service:4006
+
+  notification-service:
+    <<: *service
+    build: ./services/notification-service
+    environment:
+      <<: *node-env
+      PORT: 4008
+      DATABASE_URL: postgresql://notification_user:${SERVICES_DB_PASSWORD:-sl_dev_pass}@postgres:5432/notification_db
+      TEAM_SERVICE_URL: http://team-service:4003
+
+  analytics-service:
+    <<: *service
+    build: ./services/analytics-service
+    environment:
+      <<: *node-env
+      PORT: 4009
+      DATABASE_URL: postgresql://analytics_user:${SERVICES_DB_PASSWORD:-sl_dev_pass}@postgres:5432/analytics_db
+      # "Réplicas" de solo lectura (usuario analytics_ro con permisos SELECT)
+      FIXTURE_REPLICA_URL: postgresql://analytics_ro:${ANALYTICS_RO_PASSWORD:-sl_ro_pass}@postgres:5432/fixture_db
+      LIVESCORE_REPLICA_URL: postgresql://analytics_ro:${ANALYTICS_RO_PASSWORD:-sl_ro_pass}@postgres:5432/livescore_db
+      STATISTICS_REPLICA_URL: postgresql://analytics_ro:${ANALYTICS_RO_PASSWORD:-sl_ro_pass}@postgres:5432/statistics_db
+      ETL_INTERVAL_MINUTES: 2
+
+  # ---------- Punto de entrada ----------
+  api-gateway:
+    build: ./services/api-gateway
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    environment:
+      <<: *node-env
+      PORT: 4000
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-me}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      AUTH_SERVICE_URL: http://auth-service:4001
+      LEAGUE_SERVICE_URL: http://league-service:4002
+      TEAM_SERVICE_URL: http://team-service:4003
+      FIXTURE_SERVICE_URL: http://fixture-service:4004
+      REFEREE_SERVICE_URL: http://referee-service:4005
+      LIVE_SCORE_SERVICE_URL: http://live-score-service:4006
+      STATISTICS_SERVICE_URL: http://statistics-service:4007
+      NOTIFICATION_SERVICE_URL: http://notification-service:4008
+      ANALYTICS_SERVICE_URL: http://analytics-service:4009
+      RATE_LIMIT_AUTH: ${RATE_LIMIT_AUTH:-20}
+      RATE_LIMIT_WRITE: ${RATE_LIMIT_WRITE:-300}
+      RATE_LIMIT_READ: ${RATE_LIMIT_READ:-1200}
+    ports:
+      - "4000:4000"
+    networks: [backend]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL:-http://localhost:4006}
+    restart: unless-stopped
+    depends_on:
+      - api-gateway
+    environment:
+      API_INTERNAL_URL: http://api-gateway:4000
+    ports:
+      - "3000:3000"
+    networks: [backend]
+
+  # ---------- Datos de demostración (opcional, no arranca con "up") ----------
+  #   docker compose --profile demo run --rm seed
+  # Ejecuta scripts/seed-demo.mjs dentro de la red de Docker: no requiere Node en el equipo.
+  seed:
+    image: node:22-alpine
+    profiles: [demo]
+    working_dir: /scripts
+    command: ["node", "seed-demo.mjs"]
+    environment:
+      API_URL: http://api-gateway:4000
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@sportsleague.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin12345}
+    volumes:
+      - ./scripts:/scripts:ro
+    depends_on:
+      - api-gateway
+    networks: [backend]
+
+  # ---------- Observabilidad ----------
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./infra/prometheus:/etc/prometheus:ro
+    ports:
+      - "9090:9090"
+    networks: [backend]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/sportsleague.json
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3100:3000"
+    networks: [backend]
+
+networks:
+  backend:
+
+volumes:
+  pgdata:

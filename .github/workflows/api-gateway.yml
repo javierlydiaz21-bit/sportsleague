@@ -1,0 +1,29 @@
+name: api-gateway
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'services/api-gateway/**'
+      - '.github/workflows/api-gateway.yml'
+      - '.github/workflows/service-pipeline.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/api-gateway/**'
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: api-gateway-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/service-pipeline.yml
+    with:
+      service: api-gateway
+    secrets:
+      RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_GATEWAY }}

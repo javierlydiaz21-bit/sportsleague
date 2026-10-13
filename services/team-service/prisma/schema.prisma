@@ -1,0 +1,60 @@
+// Team Service — base de datos propia (team_db).
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EligibilityStatus {
+  ELIGIBLE
+  INELIGIBLE
+  PENDING
+}
+
+model Team {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  /// Referencias conceptuales al League Service (sin llave foránea física entre bases de datos).
+  leagueId     String   @map("league_id") @db.Uuid
+  categoryId   String   @map("category_id") @db.Uuid
+  ownerId      String   @map("owner_id") @db.Uuid
+  /// Restricción específica del equipo: cancha propia preferida para jugar de local.
+  homeVenueId  String?  @map("home_venue_id") @db.Uuid
+  coachName    String?  @map("coach_name")
+  contactEmail String?  @map("contact_email")
+  color        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  players      Player[]
+
+  @@unique([categoryId, name])
+  @@index([categoryId])
+  @@index([leagueId])
+  @@map("teams")
+}
+
+model Player {
+  id                 String            @id @default(uuid()) @db.Uuid
+  teamId             String            @map("team_id") @db.Uuid
+  firstName          String            @map("first_name")
+  lastName           String            @map("last_name")
+  documentId         String?           @map("document_id")
+  birthDate          DateTime          @map("birth_date") @db.Date
+  jerseyNumber       Int?              @map("jersey_number")
+  position           String?
+  eligibilityStatus  EligibilityStatus @default(PENDING) @map("eligibility_status")
+  eligibilityNote    String?           @map("eligibility_note")
+  /// Documentación de fichaje (enlace al documento escaneado).
+  registrationDocUrl String?           @map("registration_doc_url")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  team               Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, jerseyNumber])
+  @@index([teamId])
+  @@map("players")
+}

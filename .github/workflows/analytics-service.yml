@@ -1,0 +1,29 @@
+name: analytics-service
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'services/analytics-service/**'
+      - '.github/workflows/analytics-service.yml'
+      - '.github/workflows/service-pipeline.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/analytics-service/**'
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: analytics-service-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/service-pipeline.yml
+    with:
+      service: analytics-service
+    secrets:
+      RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_ANALYTICS }}

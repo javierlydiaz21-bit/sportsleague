@@ -1,0 +1,71 @@
+// Live Score Service — base de datos propia (livescore_db).
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LiveStatus {
+  LIVE
+  FINISHED
+  SUSPENDED
+}
+
+/// gol, tarjeta_amarilla, tarjeta_roja o sustitución
+enum EventType {
+  GOAL
+  YELLOW_CARD
+  RED_CARD
+  SUBSTITUTION
+}
+
+/// Partido en vivo / acta oficial. El marcador NO se almacena: se deriva de match_events.
+model LiveMatch {
+  matchId     String       @id @map("match_id") @db.Uuid
+  leagueId    String       @map("league_id") @db.Uuid
+  seasonId    String       @map("season_id") @db.Uuid
+  categoryId  String       @map("category_id") @db.Uuid
+  ownerId     String       @map("owner_id") @db.Uuid
+  homeTeamId  String       @map("home_team_id") @db.Uuid
+  awayTeamId  String       @map("away_team_id") @db.Uuid
+  status      LiveStatus   @default(LIVE)
+  startedAt   DateTime     @default(now()) @map("started_at")
+  finishedAt  DateTime?    @map("finished_at")
+  /// Asistencia reportada en el acta (la usa Analytics para la asistencia estimada).
+  attendance  Int?
+  /// Máximo de espectadores conectados por WebSocket.
+  peakViewers Int          @default(0) @map("peak_viewers")
+  notes       String?
+  /// Versión del acta: aumenta en el cierre y en cada corrección posterior.
+  version     Int          @default(0)
+  events      MatchEvent[]
+
+  @@index([leagueId])
+  @@index([seasonId, categoryId])
+  @@index([status])
+  @@map("live_matches")
+}
+
+/// Cada fila es un hecho atómico e inmutable ocurrido en un minuto del partido.
+model MatchEvent {
+  id         String    @id @default(uuid()) @db.Uuid
+  matchId    String    @map("match_id") @db.Uuid
+  type       EventType
+  teamId     String    @map("team_id") @db.Uuid
+  playerId   String?   @map("player_id") @db.Uuid
+  playerInId String?   @map("player_in_id") @db.Uuid
+  minute     Int
+  /// Valor del tanto (básquet: 1, 2 o 3 puntos). Para el resto de eventos es 1.
+  value      Int       @default(1)
+  createdBy  String    @map("created_by") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at")
+  match      LiveMatch @relation(fields: [matchId], references: [matchId], onDelete: Cascade)
+
+  @@index([matchId])
+  @@index([matchId, minute])
+  @@map("match_events")
+}

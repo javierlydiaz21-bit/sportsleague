@@ -1,0 +1,67 @@
+// Notification Service — base de datos propia (notification_db).
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Bandeja de notificaciones. El destinatario puede ser un usuario, un correo o un rol (p. ej. ADMIN).
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  email     String?
+  role      String?
+  type      String
+  title     String
+  body      String
+  link      String?
+  read      Boolean  @default(false)
+  eventId   String   @map("event_id")
+  /// Evita duplicados si el mismo evento se procesa dos veces (idempotencia).
+  dedupeKey String   @unique @map("dedupe_key")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([email])
+  @@index([role])
+  @@map("notifications")
+}
+
+/// Aficionados (o cualquier usuario) que siguen una liga para recibir avisos.
+model Subscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  email     String
+  leagueId  String   @map("league_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, leagueId])
+  @@index([leagueId])
+  @@map("subscriptions")
+}
+
+model Preference {
+  userId       String   @id @map("user_id") @db.Uuid
+  emailEnabled Boolean  @default(true) @map("email_enabled")
+  pushEnabled  Boolean  @default(true) @map("push_enabled")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("preferences")
+}
+
+/// Registro de envíos por canal externo (correo / push). En esta versión el envío es simulado.
+model Delivery {
+  id        String   @id @default(uuid()) @db.Uuid
+  channel   String
+  recipient String
+  subject   String
+  status    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("deliveries")
+}

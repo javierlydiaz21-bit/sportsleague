@@ -1,0 +1,78 @@
+{
+  "name": "auth-service",
+  "version": "1.0.0",
+  "description": "Auth Service: cuentas de usuario, roles, JWT y refresh tokens",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "start:dev": "node --env-file-if-exists=.env ./node_modules/@nestjs/cli/bin/nest.js start --watch",
+    "start:prod": "prisma migrate deploy && node dist/main.js",
+    "lint": "eslint src test",
+    "test": "jest",
+    "test:cov": "jest --coverage",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js migrate dev",
+    "prisma:deploy": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js migrate deploy"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.2.7",
+    "@nestjs/core": "^11.2.7",
+    "@nestjs/platform-express": "^11.2.7",
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.4",
+    "ioredis": "^5.11.1",
+    "jsonwebtoken": "^9.0.3",
+    "prisma": "^6.19.3",
+    "prom-client": "^15.1.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@nestjs/cli": "^11.0.24",
+    "@nestjs/testing": "^11.2.7",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^29.5.14",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.20.5",
+    "@types/supertest": "^6.0.3",
+    "eslint": "^9.39.5",
+    "globals": "^16.5.0",
+    "jest": "^29.7.0",
+    "supertest": "^7.3.1",
+    "ts-jest": "^29.4.14",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.1"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": ".",
+    "roots": [
+      "<rootDir>/src",
+      "<rootDir>/test"
+    ],
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.ts$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/main.ts",
+      "!src/chassis/**"
+    ],
+    "coverageDirectory": "coverage",
+    "testEnvironment": "node",
+    "testTimeout": 20000
+  }
+}

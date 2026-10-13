@@ -1,0 +1,388 @@
+# SportsLeague
+
+Plataforma de gestión de ligas deportivas amateur (fútbol, básquet y vóley) construida con
+**microservicios independientes**: cada servicio tiene su propio código, su propia base de datos
+PostgreSQL, su propio Dockerfile y su propio pipeline de CI/CD.
+
+- **Organizadores**: crean su liga, temporadas, categorías y reglamento, canchas, equipos y
+  jugadores, árbitros; generan el calendario automáticamente y controlan los partidos en vivo.
+- **Administrador**: autoriza (o rechaza/suspende) las ligas, gestiona las cuentas y verifica
+  que todo funcione: salud de cada microservicio, bus de eventos y trazabilidad por partido.
+- **Árbitros**: ven y confirman sus partidos asignados y registran goles, tarjetas y cambios.
+- **Aficionados**: siguen ligas, ven el marcador en tiempo real y reciben avisos.
+
+---
+
+## Inicio rápido
+
+Único requisito: **Docker Desktop** (Windows/macOS) o Docker Engine con el plugin compose
+(Linux). No hace falta instalar Node.js: todo se instala dentro de los contenedores.
+
+**Windows** — doble clic en **`iniciar.bat`**. El script:
+
+1. comprueba que Docker esté en ejecución (si no, abre Docker Desktop) y que los puertos estén libres;
+2. construye las 11 imágenes de a pocas, reintentando si npm pierde la conexión
+   (la primera vez tarda 10–20 minutos y necesita internet; después queda en caché);
+3. arranca todo con `docker compose up -d` y espera a que la plataforma responda;
+4. carga la liga de demostración y abre **http://localhost:3000**.
+
+Para detener: **`detener.bat`** (los datos se conservan). Opciones desde PowerShell:
+`.\iniciar.ps1 -SinDemo`, `-SinConstruir` (arranque rápido con las imágenes ya construidas), `-SinNavegador`.
+
+**Linux / macOS**: `sh iniciar.sh` (admite `--sin-demo` y `--sin-construir`).
+
+**Manual** (cualquier sistema):
+
+```bash
+docker compose up --build -d                  # plataforma + observabilidad
+docker compose --profile demo run --rm seed   # liga de demostración (equivale a node scripts/seed-demo.mjs)
+```
+
+| Cuenta | Correo | Contraseña |
+|---|---|---|
+| Administrador | `admin@sportsleague.com` | `Admin12345` |
+| Organizador (liga de demo) | `organizador@demo.com` | `Demo12345` |
+| Organizadora (2 ligas pendientes) | `organizadora@demo.com` | `Demo12345` |
+| Árbitro | `arbitro@demo.com` | `Demo12345` |
+| Aficionado | `aficionado@demo.com` | `Demo12345` |
+
+| URL | Qué es |
+|---|---|
+| http://localhost:3000 | Web (pública, panel de organizador/árbitro y administración) |
+| http://localhost:4000 | API Gateway — único punto de entrada HTTP |
+| http://localhost:4006 | Canal WebSocket del Live Score Service (espectadores) |
+| http://localhost:3100 | Grafana (`admin` / `admin`) con el dashboard "Jornada en vivo" |
+| http://localhost:9090 | Prometheus (métricas y alertas) |
+
+Comandos útiles:
+
+```bash
+docker compose ps                          # estado de los contenedores (healthy = listo)
+docker compose logs -f live-score-service  # logs JSON de un servicio
+docker compose down                        # detener (conserva los datos)
+docker compose down -v                     # detener y borrar las bases de datos
+```
+
+> El usuario administrador se crea automáticamente al iniciar el Auth Service con
+> `ADMIN_EMAIL` / `ADMIN_PASSWORD` (ver `.env.example`). Cambia todos los secretos antes de
+> desplegar en producción.
+
+### Llevar el proyecto a otro equipo
+
+1. Copia la carpeta completa (≈6 MB: no incluye `node_modules`, todo se instala dentro de Docker).
+2. Déjala en una carpeta local, por ejemplo `C:\SportsLeague`. Evita carpetas sincronizadas
+   (OneDrive, Dropbox): con "archivos a petición" la construcción puede fallar al leer archivos
+   que todavía no se han descargado.
+3. Instala **Docker Desktop**, ábrelo una vez y acepta los términos (en Windows, si lo pide,
+   activa WSL 2 y reinicia). Espera a que indique *Engine running*.
+4. Doble clic en `iniciar.bat`.
+
+Equipo recomendado: Windows 10/11 de 64 bits, 8 GB de RAM (Docker con al menos 4 GB en
+*Settings → Resources*), 10 GB libres en disco e internet en el primer arranque.
+
+Verificado con Docker Desktop 4.91 (Compose v5.5) en Windows 11 con 8 GB de RAM: la primera
+construcción tardó ≈11 minutos y el arranque completo con la demo ≈15; los siguientes arranques
+(`.\iniciar.ps1 -SinConstruir`) tardan menos de 1 minuto y conservan los datos.
+
+| Problema | Solución |
+|---|---|
+| `puerto 3000 ... ocupado` | Cierra el programa que lo usa o cambia el puerto de la izquierda en `docker-compose.yml` (p. ej. `"3001:3000"`). Si cambias el de la web, crea un `.env` (ver `.env.example`) con `CORS_ORIGINS` y `WS_ALLOWED_ORIGINS` apuntando a la nueva URL |
+| El script dice *Abre Docker Desktop y espera...* y no lo abre solo | `iniciar.ps1` busca Docker Desktop en `C:\Program Files\Docker\Docker` y en `%LOCALAPPDATA%\Programs\DockerDesktop` (instalación solo para el usuario actual). Si está en otra ruta, ábrelo a mano: el script espera hasta 4 minutos a que el motor responda |
+| `ETIMEDOUT` / `ECONNRESET` al construir | Red inestable: vuelve a ejecutar `iniciar.bat`; lo ya construido queda en caché |
+| Docker no responde o los contenedores se quedan en *Created* | Docker Desktop → *Troubleshoot* → *Restart* (o reinicia el equipo) y vuelve a ejecutar |
+| La web abre pero no hay ligas | `docker compose --profile demo run --rm seed` |
+| El inicio de sesión falla al entrar por `http://127.0.0.1:3000` | Usa `http://localhost:3000`: es el origen permitido por CORS |
+| En Grafana, el panel *Rate limiting (429) y circuit breakers abiertos* dice *No data* | Es normal: solo muestra series cuando el gateway rechaza solicitudes o se abre un circuito |
+| Empezar de cero | `docker compose down -v` y luego `iniciar.bat` |
+
+### Recorrido sugerido para la demostración
+
+1. Entra como **organizadora@demo.com** → *Mis ligas* → crea una liga: queda **pendiente**.
+2. Entra como **admin** → *Administración → Ligas*: apruébala. La organizadora recibe la notificación.
+3. Como organizadora configura temporada, categoría, canchas, equipos (prueba un jugador
+   menor de la edad mínima: queda *No elegible*), árbitros → *Calendario → Generar borrador → Publicar*.
+4. En *Árbitros* verás las asignaciones automáticas; con **arbitro@demo.com** confírmalas.
+5. Abre un partido en dos ventanas: una como espectador (`/partidos/<id>`) y otra en
+   *Control en vivo*. Cada gol aparece al instante en la otra ventana (WebSocket).
+6. Finaliza el partido: la tabla de posiciones se recalcula sola.
+7. Como **admin** revisa *Sistema* (los 10 servicios, canales de eventos, ETL), *Eventos*
+   (bus de Redis en tiempo real) y *Trazabilidad* (todo el ciclo de vida de un partido).
+
+---
+
+## Arquitectura
+
+```mermaid
+flowchart LR
+  subgraph Clientes
+    WEB["Web Next.js<br/>(organizadores, árbitros,<br/>aficionados, admin)"]
+  end
+  WEB -- HTTP --> GW["API Gateway<br/>JWT · rate limiting · CORS · logs"]
+  WEB -. WebSocket .-> LIVE
+
+  GW --> AUTH[Auth]
+  GW --> LEAGUE[League]
+  GW --> TEAM[Team]
+  GW --> FIX[Fixture]
+  GW --> REF[Referee]
+  GW --> LIVE[Live Score]
+  GW --> STATS[Statistics]
+  GW --> NOTI[Notification]
+  GW --> ANA[Analytics]
+
+  FIX -- REST --> LEAGUE
+  FIX -- REST --> TEAM
+  TEAM -- REST --> LEAGUE
+  STATS -- REST --> LEAGUE
+  LIVE -- REST --> FIX
+  LIVE -- REST --> REF
+
+  BUS(("Redis Pub/Sub"))
+  FIX & LIVE & LEAGUE & AUTH & REF & STATS -. eventos .-> BUS
+  BUS -. eventos .-> REF & STATS & NOTI & FIX & LIVE
+
+  ANA -. réplicas de solo lectura .-> DBF[(fixture_db)] & DBL[(livescore_db)] & DBS[(statistics_db)]
+```
+
+Cada microservicio tiene **su propia base de datos** (`auth_db`, `league_db`, `team_db`,
+`fixture_db`, `referee_db`, `livescore_db`, `statistics_db`, `notification_db`,
+`analytics_db`) con **su propio usuario de PostgreSQL**; ningún servicio puede conectarse a la
+base de otro (`REVOKE ... FROM PUBLIC`). El Analytics Service lee las bases operativas solo a
+través del usuario `analytics_ro` (permisos `SELECT`, transacciones de solo lectura), que
+simula las réplicas de lectura del documento.
+
+### Microservicios
+
+| Servicio | Puerto | Responsabilidad | Llama por REST a | Publica | Consume |
+|---|---|---|---|---|---|
+| **API Gateway** | 4000 | Enrutamiento, validación de JWT, bloqueo de cuentas suspendidas, rate limiting, CORS, logs, salud agregada | todos | — | — |
+| **Auth** *(nuevo)* | 4001 | Cuentas, roles, contraseñas (bcrypt), access + refresh tokens rotativos | — | `user.registered`, `user.updated` | — |
+| **League** | 4002 | Ligas (aprobación del admin), temporadas, categorías, reglamento, canchas | — | `league.created`, `league.reviewed`, `rules.updated` | — |
+| **Team** | 4003 | Equipos, plantillas, elegibilidad automática por edad | League | — | — |
+| **Fixture** | 4004 | Generación del calendario, partidos manuales, reprogramaciones, suspensiones | League, Team | `fixture.published` (por jornada), `match.rescheduled`, `match.suspended` | `match.started`, `match.completed` |
+| **Referee** | 4005 | Árbitros, disponibilidad, asignación automática | — | `referee.assigned`, `referee.unassigned` | `fixture.published`, `match.rescheduled`, `match.suspended`, `match.completed` |
+| **Live Score** | 4006 | Eventos en vivo (REST) y difusión por WebSocket, actas versionadas | Fixture, Referee, Team | `match.started`, `match.event`, `match.event.deleted`, `match.completed` | `match.suspended` (+ sus propios eventos para difundirlos) |
+| **Statistics** | 4007 | Tabla de posiciones, goleadores, disciplina (recálculo idempotente, caché Redis) | League, Live Score | `standings.updated` | `match.completed`, `fixture.published`, `rules.updated`, `match.event` |
+| **Notification** | 4008 | Bandeja de notificaciones, seguidores de ligas, envíos (correo/push simulados) | Team | — | `league.*`, `user.registered`, `fixture.published`, `referee.*`, `match.rescheduled`, `match.suspended`, `match.completed` |
+| **Analytics** | 4009 | ETL periódico: asistencia estimada, partidos suspendidos, tendencia de rendimiento, KPIs | — (réplicas de solo lectura) | — | — |
+
+### Flujo completo de un partido
+
+```mermaid
+sequenceDiagram
+  participant O as Organizador
+  participant F as Fixture
+  participant R as Referee
+  participant N as Notification
+  participant A as Árbitro (app)
+  participant G as API Gateway
+  participant L as Live Score
+  participant B as Redis Pub/Sub
+  participant S as Statistics
+  participant E as Espectadores (WS)
+
+  O->>G: POST /fixtures/{id}/publish
+  G->>F: (JWT validado)
+  F-->>B: fixture.published (una vez por jornada)
+  B-->>R: asigna árbitro (disponibilidad, zona, categoría)
+  R-->>B: referee.assigned
+  B-->>N: avisa al árbitro, al organizador y a los seguidores
+  A->>G: POST /matches/{id}/events (gol)
+  G->>L: permisos: ¿árbitro asignado? (consulta a Referee)
+  L-->>B: match.event
+  B-->>L: todas las réplicas difunden por WebSocket
+  L-->>E: marcador actualizado al instante
+  A->>G: POST /matches/{id}/complete
+  L-->>B: match.completed (acta v1)
+  B-->>S: recalcula la tabla (idempotente)
+  B-->>F: estado FINISHED
+  B-->>N: resultado final a equipos y aficionados
+```
+
+### Decisiones de comunicación
+
+- **REST síncrono** solo donde se necesita una respuesta inmediata: Fixture → League/Team al
+  generar el calendario, Team → League para el rango de edad, Statistics → League para el
+  reglamento, Live Score → Fixture al iniciar el partido y → Referee para validar permisos.
+  Todas las llamadas usan el `ServiceClient` del chassis: **timeout**, **reintentos con backoff
+  exponencial** (solo lecturas) y **circuit breaker** (5 fallos → abierto 15 s → semiabierto).
+  Los estados de los circuitos se ven en *Administración → Sistema* y en Grafana.
+- **Eventos asíncronos** (Redis Pub/Sub) para todo el flujo del partido. Se prioriza la baja
+  latencia sobre la garantía de entrega, como define el documento; por eso:
+  - los consumidores son **idempotentes** (asignaciones únicas por partido, notificaciones con
+    `dedupeKey`, actas con `version`);
+  - Statistics **recalcula desde las actas completas** (no suma incrementos) y ofrece
+    *Recalcular* con reconciliación: vuelve a leer las actas oficiales del Live Score Service
+    si se perdió algún `match.completed`;
+  - las correcciones del acta tras el cierre republican `match.completed` con una versión nueva.
+- **Saga**: no se usa (no hay transacciones de negocio compensables); se aplica consistencia
+  eventual + recálculo idempotente.
+- **Resiliencia en vivo**: si Team Service cae durante un partido, el registro de eventos no se
+  bloquea (la plantilla se cachea al iniciar); si League Service cae al fichar, el jugador queda
+  *pendiente* de validación y se puede revalidar luego.
+
+### Microservice chassis
+
+La carpeta [`chassis/`](chassis) contiene el código transversal (logs JSON, métricas
+Prometheus, `/health` `/status` `/metrics`, guard de autenticación por cabeceras del gateway,
+bus de eventos, caché, trazas por `match_id`, cliente REST resiliente, validación con mensajes
+en español). **Se copia (vendoriza) dentro de cada servicio** en `src/chassis`: no es una
+librería compartida en tiempo de ejecución, así cada servicio se construye y despliega solo.
+Para propagar una mejora: `node scripts/sync-chassis.mjs`.
+
+---
+
+## Seguridad
+
+| Medida | Implementación |
+|---|---|
+| Autenticación | JWT HS256 de 15 min firmado por Auth Service y validado por el gateway en cada solicitud |
+| Refresh tokens | Opacos, guardados como hash SHA-256, **rotativos** con detección de reutilización (si se reusa uno revocado se cierran todas las sesiones); en la web viajan en cookie `httpOnly` `SameSite` con `Path=/api/v1/auth` |
+| CSRF | El refresh por cookie exige el token anti-CSRF emitido al iniciar sesión (cabecera `X-CSRF-Token`) |
+| Permisos diferenciados | Roles ADMIN / ORGANIZER / REFEREE / SPECTATOR; el organizador solo modifica sus ligas; **un árbitro solo registra eventos de los partidos que tiene asignados** (verificado contra Referee Service) |
+| Suspensión inmediata | Al suspender una cuenta, el gateway la bloquea al instante (lista en Redis) aunque su JWT siga vigente |
+| Red privada | Solo gateway, WebSocket y web publican puertos; cada servicio exige un token interno (`x-internal-token`) y el gateway elimina cabeceras de identidad falsificadas |
+| Rate limiting | Ventana fija en Redis compartida entre réplicas: login/registro 20/min por IP, escrituras 300/min, lecturas 1200/min (configurable) |
+| Contraseñas | bcrypt (10 rondas), mínimo 8 caracteres con letras y números; tiempo constante ante correos inexistentes |
+| SQL injection | Prisma (consultas parametrizadas) + `ValidationPipe` con `whitelist` y `forbidNonWhitelisted` |
+| XSS | React escapa todo el contenido dinámico; cabeceras `X-Content-Type-Options`, `X-Frame-Options`, Helmet en el gateway |
+| CORS | El gateway rechaza orígenes no listados en `CORS_ORIGINS`; el WebSocket solo acepta `WS_ALLOWED_ORIGINS` |
+| Validación | DTOs con class-validator en todos los servicios (fechas, rangos de edad, minutos 0–200, horarios HH:MM...) |
+
+---
+
+## Observabilidad
+
+- **Logs estructurados (JSON)** en todos los servicios con `requestId`, `userId` y `match_id`.
+  El `x-request-id` se propaga entre servicios y eventos.
+- **Trazabilidad completa por `match_id`**: todo log con `matchId` se replica en un Redis Stream
+  (`trace:match:<id>`). *Administración → Trazabilidad* muestra el recorrido de un partido por
+  todos los microservicios: publicación, asignación de árbitro, eventos en vivo, acta, recálculo
+  de la tabla y notificaciones.
+- **Prometheus**: métricas HTTP de cada servicio y del gateway, más las del dominio:
+  `match_events_registered_total{type,league_id,season_id,category_id}` (eventos por minuto),
+  `live_score_update_latency_seconds` (desde que el árbitro registra el evento hasta que se
+  difunde por WebSocket), `live_viewers_total`, `standings_recalculations_total`,
+  `referee_assignments_total`, `circuit_breaker_state`, `gateway_rate_limit_rejections_total`.
+- **Grafana**: dashboard "SportsLeague — Jornada en vivo" con filtros por liga, temporada y categoría.
+- **Alertas** (`infra/prometheus/alerts.yml`): servicio caído, tasa de errores, latencia del
+  gateway, latencia del marcador en vivo, CPU alta en Live Score, circuito abierto.
+- **Health checks**: `/health` (base de datos + Redis; Render lo usa para los rolling updates) y
+  `/status` (detalle) en cada servicio; *Administración → Sistema* los agrega.
+
+---
+
+## Estructura del repositorio
+
+```
+chassis/                 plantilla del microservice chassis (se copia a cada servicio)
+services/
+  api-gateway/           cada servicio: src/, test/, prisma/ (schema + migraciones),
+  auth-service/          Dockerfile, package.json, .env.example, eslint y tsconfig propios
+  league-service/
+  team-service/
+  fixture-service/       src/fixtures/scheduler.ts → motor del calendario
+  referee-service/       src/assignments/matching.ts → selección de árbitros
+  live-score-service/    src/live/live.gateway.ts → WebSocket
+  statistics-service/    src/statistics/calculator.ts → tabla y desempates
+  notification-service/
+  analytics-service/     src/etl/ → ETL sobre réplicas de solo lectura
+frontend/                Next.js 15 + TypeScript + Tailwind CSS 4
+infra/                   PostgreSQL (una base por servicio), Prometheus, Grafana
+load-tests/              k6: varias jornadas en simultáneo contra Live Score
+scripts/                 seed-demo.mjs, sync-chassis.mjs
+.github/workflows/       un pipeline por servicio + pipeline reutilizable + frontend
+render.yaml              blueprint de despliegue en Render (referencia)
+iniciar.bat / .ps1 / .sh arranque en un clic (construye, arranca, carga la demo)
+detener.bat              detiene los contenedores conservando los datos
+```
+
+---
+
+## Pruebas
+
+Cada servicio tiene pruebas unitarias e integración HTTP con Jest (155 pruebas en total), por ejemplo:
+
+- Fixture: propiedades del round-robin (cada par se enfrenta una vez, localía equilibrada ±1,
+  nadie juega dos veces por jornada) y del calendario (descanso mínimo, canchas y horarios).
+- Statistics: puntos por reglamento, desempates (diferencia de gol, goles, enfrentamiento
+  directo, triple empate), idempotencia y correcciones del acta.
+- Gateway: integración con un microservicio simulado (propagación de identidad, cabeceras
+  falsificadas, rutas de admin, rutas internas bloqueadas, cuentas suspendidas).
+- Live Score: permisos del árbitro asignado, actas versionadas y difusión por WebSocket.
+
+```bash
+cd services/fixture-service
+npm ci && npx prisma generate
+npm run lint && npm test
+```
+
+Prueba de punta a punta: con los 10 servicios sobre PostgreSQL y Redis reales se aplicaron las
+9 migraciones, se cargó la demo completa (30 partidos, 30/30 árbitros asignados
+automáticamente, tabla recalculada, notificaciones y ETL sobre el usuario de solo lectura), el
+marcador se difundió por WebSocket en ~20 ms, un árbitro no asignado recibió `403` al intentar
+registrar un gol y se recorrieron todas las pantallas (escritorio y móvil, claro y oscuro) sin
+errores en la consola.
+
+Pruebas de carga (requiere [k6](https://k6.io)):
+
+```bash
+docker compose up -d postgres redis live-score-service
+k6 run load-tests/live-score.js -e LIVE_URL=http://localhost:4006
+```
+
+---
+
+## Desarrollo sin Docker (un servicio a la vez)
+
+```bash
+docker compose up -d postgres redis      # infraestructura (puertos 5440 y 6380 en localhost)
+cd services/league-service
+cp .env.example .env
+npm install
+npm run prisma:deploy                    # aplica las migraciones a su base de datos
+npm run start:dev
+```
+
+> ⚠️ **OneDrive**: este proyecto está dentro de una carpeta sincronizada. Instalar
+> `node_modules` aquí (≈300 MB por servicio) hará que OneDrive sincronice decenas de miles de
+> archivos. Para desarrollar sin Docker, mueve el proyecto fuera de OneDrive (p. ej. `C:\dev`)
+> o excluye las carpetas `node_modules`. Con `docker compose` no hace falta instalar nada.
+
+---
+
+## CI/CD y despliegue
+
+- `.github/workflows/<servicio>.yml`: se dispara solo cuando cambia ese servicio y llama a
+  `service-pipeline.yml`: **npm ci → ESLint → Jest (con cobertura) → build → (k6 en Live Score)
+  → imagen Docker publicada en GHCR** (`ghcr.io/<owner>/sportsleague-<servicio>:<sha>`) →
+  **despliegue en Render** con rolling update (solo en `main`).
+- Secretos por servicio: `RENDER_DEPLOY_HOOK_<SERVICIO>` (p. ej. `RENDER_DEPLOY_HOOK_LIVE_SCORE`).
+  Sin el secreto, el despliegue se omite sin fallar.
+- **Rollback**: volver a desplegar en Render la imagen de un `sha` anterior (todas quedan versionadas en GHCR).
+- **Migraciones**: cada contenedor ejecuta `prisma migrate deploy` antes de recibir tráfico.
+- **Frontend**: `frontend.yml` hace lint, chequeo de tipos y build; el despliegue lo hace
+  Vercel con su integración de GitHub (preview por Pull Request). Variables en Vercel:
+  `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`, `API_INTERNAL_URL`.
+- `render.yaml`: blueprint de referencia con los 10 servicios (gateway y Live Score públicos, el
+  resto privados), 9 bases de datos y Redis (Key Value).
+- Flujo Git: `feature/*` → `develop` → `main`, `hotfix/*` desde `main`; PR con revisión y checks en verde.
+
+---
+
+## Decisiones respecto al documento de arquitectura
+
+- **Auth Service agregado**: el documento exige cuentas, JWT con refresh tokens y bcrypt, pero
+  no asigna un servicio; se creó uno dedicado (el gateway solo valida tokens).
+- **Ligas con aprobación**: una liga nace *pendiente*; el administrador la aprueba, rechaza o
+  suspende. Solo las ligas aprobadas son públicas y pueden generar calendario.
+- **Identificadores UUID** en lugar de autoincrementales: evitan colisiones y la enumeración de
+  recursos entre servicios.
+- **El marcador no se almacena**: se deriva de `match_events` (fiel a la normalización del
+  documento); `matches` solo guarda referencias por id y la web compone nombres consultando a Team.
+- **Árbitros enlazados por correo**: el organizador registra al árbitro con su correo; si esa
+  persona crea una cuenta de árbitro con el mismo correo, ve y opera sus partidos.
+- **Envíos de correo/push simulados**: el Notification Service registra cada envío (visible
+  para el admin) en lugar de usar un proveedor externo.
+- **Réplicas de lectura en local**: se simulan con el usuario de solo lectura `analytics_ro`;
+  en Render se usan réplicas reales (`*_REPLICA_URL`).

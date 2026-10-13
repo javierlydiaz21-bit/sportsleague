@@ -1,0 +1,96 @@
+// Analytics Service — base de datos propia (analytics_db), alimentada por ETL
+// periódico sobre réplicas de solo lectura de Fixture, Live Score y Statistics.
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AttendanceEstimate {
+  id                  String   @id @default(uuid()) @db.Uuid
+  matchId             String   @unique @map("match_id") @db.Uuid
+  leagueId            String   @map("league_id") @db.Uuid
+  seasonId            String   @map("season_id") @db.Uuid
+  categoryId          String   @map("category_id") @db.Uuid
+  ownerId             String   @map("owner_id") @db.Uuid
+  homeTeamId          String   @map("home_team_id") @db.Uuid
+  awayTeamId          String   @map("away_team_id") @db.Uuid
+  scheduledAt         DateTime @map("scheduled_at")
+  estimatedAttendance Int      @map("estimated_attendance")
+  /// REPORTED (acta) u ONLINE_PEAK (pico de espectadores conectados)
+  source              String
+  computedAt          DateTime @default(now()) @map("computed_at")
+
+  @@index([leagueId])
+  @@map("attendance_estimates")
+}
+
+model SuspendedMatch {
+  id          String   @id @default(uuid()) @db.Uuid
+  matchId     String   @unique @map("match_id") @db.Uuid
+  leagueId    String   @map("league_id") @db.Uuid
+  seasonId    String   @map("season_id") @db.Uuid
+  categoryId  String   @map("category_id") @db.Uuid
+  ownerId     String   @map("owner_id") @db.Uuid
+  homeTeamId  String   @map("home_team_id") @db.Uuid
+  awayTeamId  String   @map("away_team_id") @db.Uuid
+  reason      String?
+  scheduledAt DateTime @map("scheduled_at")
+  computedAt  DateTime @default(now()) @map("computed_at")
+
+  @@index([leagueId])
+  @@map("suspended_matches")
+}
+
+model TeamPerformanceTrend {
+  id                       String   @id @default(uuid()) @db.Uuid
+  teamId                   String   @map("team_id") @db.Uuid
+  seasonId                 String   @map("season_id") @db.Uuid
+  categoryId               String   @map("category_id") @db.Uuid
+  leagueId                 String   @map("league_id") @db.Uuid
+  matchIndex               Int      @map("match_index")
+  matchId                  String   @map("match_id") @db.Uuid
+  result                   String
+  pointsCumulative         Int      @map("points_cumulative")
+  goalDifferenceCumulative Int      @map("goal_difference_cumulative")
+  playedAt                 DateTime @map("played_at")
+
+  @@unique([teamId, seasonId, matchIndex])
+  @@index([teamId, seasonId])
+  @@map("team_performance_trend")
+}
+
+model LeagueKpi {
+  leagueId         String   @id @map("league_id") @db.Uuid
+  ownerId          String   @map("owner_id") @db.Uuid
+  totalMatches     Int      @map("total_matches")
+  scheduled        Int
+  live             Int
+  finished         Int
+  suspended        Int
+  totalGoals       Int      @map("total_goals")
+  totalCards       Int      @map("total_cards")
+  avgGoalsPerMatch Float    @map("avg_goals_per_match")
+  avgAttendance    Float    @map("avg_attendance")
+  computedAt       DateTime @default(now()) @map("computed_at")
+
+  @@map("league_kpis")
+}
+
+model EtlRun {
+  id            String    @id @default(uuid()) @db.Uuid
+  trigger       String
+  status        String
+  startedAt     DateTime  @default(now()) @map("started_at")
+  finishedAt    DateTime? @map("finished_at")
+  durationMs    Int?      @map("duration_ms")
+  rowsProcessed Int       @default(0) @map("rows_processed")
+  error         String?
+
+  @@index([startedAt])
+  @@map("etl_runs")
+}

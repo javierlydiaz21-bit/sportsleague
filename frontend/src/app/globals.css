@@ -1,0 +1,120 @@
+@import 'tailwindcss';
+
+/* Diseño minimalista: neutros, mucho aire, un acento verde y rojo solo para "en vivo". */
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-live: var(--live);
+  --color-live-soft: var(--live-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+}
+
+:root {
+  --bg: #ffffff;
+  --surface: #fafafa;
+  --elevated: #ffffff;
+  --fg: #0a0a0a;
+  --muted: #525252;
+  --subtle: #767676;
+  --line: #ebebeb;
+  --line-strong: #d4d4d4;
+  --primary: #0a0a0a;
+  --primary-fg: #ffffff;
+  --brand: #16a34a;
+  --brand-soft: #f0fdf4;
+  --live: #dc2626;
+  --live-soft: #fef2f2;
+  --warn: #b45309;
+  --warn-soft: #fffbeb;
+  --info: #2563eb;
+  --info-soft: #eff6ff;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --elevated: #161616;
+    --fg: #fafafa;
+    --muted: #a3a3a3;
+    --subtle: #7a7a7a;
+    --line: #232323;
+    --line-strong: #343434;
+    --primary: #fafafa;
+    --primary-fg: #0a0a0a;
+    --brand: #22c55e;
+    --brand-soft: #0f1f14;
+    --live: #f87171;
+    --live-soft: #2a1212;
+    --warn: #fbbf24;
+    --warn-soft: #261d0b;
+    --info: #60a5fa;
+    --info-soft: #0f1a2b;
+    color-scheme: dark;
+  }
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+body {
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--brand) 25%, transparent);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.live-dot {
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.score-pop {
+  animation: pop 0.5s ease-out;
+}

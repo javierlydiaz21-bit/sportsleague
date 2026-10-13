@@ -1,0 +1,130 @@
+# Pipeline reutilizable: cada microservicio lo invoca con su propio workflow,
+# así cada servicio se prueba, empaqueta y despliega de forma independiente.
+name: service-pipeline
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: Carpeta del microservicio dentro de services/
+        required: true
+        type: string
+      load-test:
+        description: Ejecutar las pruebas de carga con k6 (Live Score Service)
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      RENDER_DEPLOY_HOOK:
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  quality:
+    name: Lint, pruebas y build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/${{ inputs.service }}
+    env:
+      INTERNAL_API_TOKEN: ci-internal-token
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/${{ inputs.service }}/package-lock.json
+
+      - name: Instalar dependencias (npm ci)
+        run: npm ci --no-audit --no-fund
+
+      - name: Generar cliente Prisma
+        if: hashFiles(format('services/{0}/prisma/schema.prisma', inputs.service)) != ''
+        run: npx prisma generate
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Pruebas unitarias e integración (Jest)
+        run: npm test -- --ci --coverage
+
+      - name: Compilar
+        run: npm run build
+
+  load-test:
+    name: Pruebas de carga (k6)
+    if: inputs.load-test
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Levantar Live Score Service con PostgreSQL y Redis
+        run: docker compose up -d --build --wait postgres redis live-score-service
+
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Simular varias jornadas jugándose en simultáneo
+        run: k6 run load-tests/live-score.js -e LIVE_URL=http://localhost:4006 -e INTERNAL_API_TOKEN=dev-internal-token-change-me
+
+      - name: Logs del servicio
+        if: always()
+        run: docker compose logs live-score-service --tail 200
+
+      - name: Apagar entorno
+        if: always()
+        run: docker compose down -v
+
+  image:
+    name: Imagen Docker → GHCR
+    needs: [quality, load-test]
+    if: always() && needs.quality.result == 'success' && needs.load-test.result != 'failure' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Nombre de la imagen (GHCR exige minúsculas)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/sportsleague-${{ inputs.service }}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir y publicar
+        uses: docker/build-push-action@v6
+        with:
+          context: services/${{ inputs.service }}
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:${{ github.ref_name == 'main' && 'latest' || 'develop' }}
+          cache-from: type=gha,scope=${{ inputs.service }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.service }}
+
+  deploy:
+    name: Despliegue en Render (rolling update)
+    needs: image
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Desplegar la imagen versionada
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK no está configurado: se omite el despliegue."
+            exit 0
+          fi
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/sportsleague-${{ inputs.service }}:${GITHUB_SHA}"
+          curl -fsS -X POST "${HOOK}&imgURL=$(jq -rn --arg v "$IMAGE" '$v|@uri')"
+          echo "Render desplegará $IMAGE con rolling update (health check en /health)."

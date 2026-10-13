@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.next/
+out/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.vscode/
+.idea/
+k6-summary.json

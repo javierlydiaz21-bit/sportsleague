@@ -1,0 +1,29 @@
+name: team-service
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'services/team-service/**'
+      - '.github/workflows/team-service.yml'
+      - '.github/workflows/service-pipeline.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/team-service/**'
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: team-service-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/service-pipeline.yml
+    with:
+      service: team-service
+    secrets:
+      RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_TEAM }}

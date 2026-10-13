@@ -1,0 +1,109 @@
+// League Service — base de datos propia (league_db).
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Sport {
+  FOOTBALL
+  BASKETBALL
+  VOLLEYBALL
+}
+
+/// Una liga nace PENDING y el administrador la aprueba (APPROVED), rechaza o suspende.
+enum LeagueStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+model League {
+  id          String       @id @default(uuid()) @db.Uuid
+  name        String
+  sport       Sport
+  description String?
+  city        String?
+  ownerId     String       @map("owner_id") @db.Uuid
+  ownerName   String?      @map("owner_name")
+  status      LeagueStatus @default(PENDING)
+  reviewNote  String?      @map("review_note")
+  reviewedBy  String?      @map("reviewed_by") @db.Uuid
+  reviewedAt  DateTime?    @map("reviewed_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  seasons     Season[]
+  categories  Category[]
+  venues      Venue[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@map("leagues")
+}
+
+model Season {
+  id        String   @id @default(uuid()) @db.Uuid
+  leagueId  String   @map("league_id") @db.Uuid
+  name      String
+  year      Int
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+  createdAt DateTime @default(now()) @map("created_at")
+  league    League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+  @@index([leagueId])
+  @@map("seasons")
+}
+
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  leagueId  String   @map("league_id") @db.Uuid
+  name      String
+  /// age_range del documento de arquitectura, modelado como mínimo y máximo.
+  minAge    Int?     @map("min_age")
+  maxAge    Int?     @map("max_age")
+  createdAt DateTime @default(now()) @map("created_at")
+  league    League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  rules     Rule?
+
+  @@unique([leagueId, name])
+  @@index([leagueId])
+  @@map("categories")
+}
+
+/// Reglamento de la competición: un único reglamento vigente por categoría.
+model Rule {
+  id                 String   @id @default(uuid()) @db.Uuid
+  categoryId         String   @unique @map("category_id") @db.Uuid
+  pointsWin          Int      @default(3) @map("points_win")
+  pointsDraw         Int      @default(1) @map("points_draw")
+  pointsLoss         Int      @default(0) @map("points_loss")
+  tiebreakerCriteria String[] @map("tiebreaker_criteria")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  category           Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@map("rules")
+}
+
+/// Canchas / sedes con su disponibilidad (la consulta el Fixture Service al generar el calendario).
+model Venue {
+  id            String   @id @default(uuid()) @db.Uuid
+  leagueId      String   @map("league_id") @db.Uuid
+  name          String
+  address       String?
+  zone          String
+  /// 0 = domingo ... 6 = sábado
+  availableDays Int[]    @map("available_days")
+  openTime      String   @map("open_time")
+  closeTime     String   @map("close_time")
+  createdAt     DateTime @default(now()) @map("created_at")
+  league        League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+  @@index([leagueId])
+  @@map("venues")
+}

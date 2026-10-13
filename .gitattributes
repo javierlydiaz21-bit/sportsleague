@@ -1,0 +1,8 @@
+# Los scripts que se ejecutan dentro de contenedores Linux deben conservar finales de línea LF.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+# Lanzadores de Windows
+*.bat text eol=crlf
+*.ps1 text eol=crlf

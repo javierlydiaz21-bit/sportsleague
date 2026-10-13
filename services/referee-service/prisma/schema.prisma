@@ -1,0 +1,92 @@
+// Referee Service — base de datos propia (referee_db).
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  CONFIRMED
+  DECLINED
+}
+
+model Referee {
+  id                  String              @id @default(uuid()) @db.Uuid
+  /// Organizador que registró al árbitro.
+  ownerId             String              @map("owner_id") @db.Uuid
+  /// Si es nulo, el árbitro está disponible para todas las ligas del organizador.
+  leagueId            String?             @map("league_id") @db.Uuid
+  name                String
+  /// Se enlaza con la cuenta de usuario (rol REFEREE) por correo.
+  email               String
+  phone               String?
+  zone                String
+  /// Ids de las categorías en las que está certificado (vacío = todas).
+  categoriesCertified String[]            @map("categories_certified")
+  active              Boolean             @default(true)
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  availability        Availability[]
+  assignments         RefereeAssignment[]
+
+  @@unique([ownerId, email])
+  @@index([zone])
+  @@index([email])
+  @@map("referees")
+}
+
+/// Disponibilidad horaria declarada por día de la semana.
+model Availability {
+  id        String  @id @default(uuid()) @db.Uuid
+  refereeId String  @map("referee_id") @db.Uuid
+  dayOfWeek Int     @map("day_of_week")
+  startTime String  @map("start_time")
+  endTime   String  @map("end_time")
+  referee   Referee @relation(fields: [refereeId], references: [id], onDelete: Cascade)
+
+  @@index([refereeId])
+  @@map("referee_availability")
+}
+
+/// Proyección local de los partidos publicados, construida a partir de fixture.published.
+model ScheduledMatch {
+  matchId     String   @id @map("match_id") @db.Uuid
+  leagueId    String   @map("league_id") @db.Uuid
+  leagueName  String?  @map("league_name")
+  categoryId  String   @map("category_id") @db.Uuid
+  ownerId     String   @map("owner_id") @db.Uuid
+  round       Int
+  label       String
+  scheduledAt DateTime @map("scheduled_at")
+  venueName   String?  @map("venue_name")
+  venueZone   String?  @map("venue_zone")
+  status      String   @default("SCHEDULED")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([leagueId])
+  @@index([scheduledAt])
+  @@map("scheduled_matches")
+}
+
+model RefereeAssignment {
+  id          String           @id @default(uuid()) @db.Uuid
+  matchId     String           @map("match_id") @db.Uuid
+  refereeId   String           @map("referee_id") @db.Uuid
+  scheduledAt DateTime         @map("scheduled_at")
+  confirmed   Boolean          @default(false)
+  status      AssignmentStatus @default(ASSIGNED)
+  manual      Boolean          @default(false)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  referee     Referee          @relation(fields: [refereeId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, refereeId])
+  @@index([matchId])
+  @@index([refereeId])
+  @@map("referee_assignments")
+}

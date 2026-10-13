@@ -1,0 +1,80 @@
+// Statistics Service — base de datos propia (statistics_db).
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Actas recibidas (match.completed). Son la entrada del recálculo idempotente.
+model MatchResult {
+  matchId     String   @id @map("match_id") @db.Uuid
+  leagueId    String   @map("league_id") @db.Uuid
+  seasonId    String   @map("season_id") @db.Uuid
+  categoryId  String   @map("category_id") @db.Uuid
+  ownerId     String   @map("owner_id") @db.Uuid
+  homeTeamId  String   @map("home_team_id") @db.Uuid
+  awayTeamId  String   @map("away_team_id") @db.Uuid
+  homeScore   Int      @map("home_score")
+  awayScore   Int      @map("away_score")
+  version     Int
+  completedAt DateTime @map("completed_at")
+  events      Json
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([seasonId, categoryId])
+  @@map("match_results")
+}
+
+model Standing {
+  id             String   @id @default(uuid()) @db.Uuid
+  seasonId       String   @map("season_id") @db.Uuid
+  categoryId     String   @map("category_id") @db.Uuid
+  teamId         String   @map("team_id") @db.Uuid
+  position       Int
+  played         Int
+  wins           Int
+  draws          Int
+  losses         Int
+  goalsFor       Int      @map("goals_for")
+  goalsAgainst   Int      @map("goals_against")
+  goalDifference Int      @map("goal_difference")
+  points         Int
+  /// Últimos resultados (G/E/P), del más reciente al más antiguo.
+  form           String[]
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([seasonId, categoryId, teamId])
+  @@index([seasonId, teamId])
+  @@map("standings")
+}
+
+model TopScorer {
+  id         String @id @default(uuid()) @db.Uuid
+  seasonId   String @map("season_id") @db.Uuid
+  categoryId String @map("category_id") @db.Uuid
+  playerId   String @map("player_id") @db.Uuid
+  teamId     String @map("team_id") @db.Uuid
+  goals      Int
+
+  @@unique([seasonId, categoryId, playerId])
+  @@index([seasonId, goals])
+  @@map("top_scorers")
+}
+
+model DisciplinaryRecord {
+  id          String @id @default(uuid()) @db.Uuid
+  seasonId    String @map("season_id") @db.Uuid
+  categoryId  String @map("category_id") @db.Uuid
+  playerId    String @map("player_id") @db.Uuid
+  teamId      String @map("team_id") @db.Uuid
+  yellowCards Int    @map("yellow_cards")
+  redCards    Int    @map("red_cards")
+
+  @@unique([seasonId, categoryId, playerId])
+  @@index([playerId])
+  @@map("disciplinary_records")
+}
