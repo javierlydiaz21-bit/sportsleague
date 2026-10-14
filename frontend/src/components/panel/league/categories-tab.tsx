@@ -7,6 +7,7 @@ import type { Category, Rules, Sport } from '@/lib/types';
 import { Modal, useToast } from '../../overlay';
 import { Badge, Button, Card, EmptyState, Field, Input, SectionTitle, cn } from '../../ui';
 import type { LeagueTabProps } from '../league-manager';
+import { StepNavigation, useUnsavedChanges } from './setup-flow';
 
 const DEFAULT_RULES: Record<Sport, Rules> = {
   FOOTBALL: { pointsWin: 3, pointsDraw: 1, pointsLoss: 0, tiebreakerCriteria: ['GOAL_DIFFERENCE', 'GOALS_FOR', 'HEAD_TO_HEAD'] },
@@ -66,6 +67,7 @@ export function CategoriesTab({ league, reload }: LeagueTabProps) {
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [editRules, setEditRules] = useState<Rules>(DEFAULT_RULES[league.sport]);
+  const markSaved = useUnsavedChanges({ form, rules });
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -79,6 +81,7 @@ export function CategoriesTab({ league, reload }: LeagueTabProps) {
       });
       await reload();
       setForm({ name: '', minAge: '', maxAge: '' });
+      markSaved();
       toast.success('Categoría creada');
     } catch (err) {
       toast.error(errorMessage(err));
@@ -101,86 +104,89 @@ export function CategoriesTab({ league, reload }: LeagueTabProps) {
   };
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_24rem]">
-      <div>
-        <SectionTitle title="Categorías" description="Cada categoría tiene su rango de edad (elegibilidad) y su propio reglamento." />
-        {league.categories.length === 0 ? (
-          <EmptyState title="Aún no hay categorías" description="Por ejemplo: Libre, Sub-17, Femenino." />
-        ) : (
-          <div className="space-y-3">
-            {league.categories.map((category) => (
-              <Card key={category.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-medium">{category.name}</p>
-                  <p className="mt-0.5 text-xs text-muted">
-                    {category.minAge !== null || category.maxAge !== null
-                      ? `Edad ${category.minAge ?? 'sin mínimo'} – ${category.maxAge ?? 'sin máximo'}`
-                      : 'Sin límite de edad'}
-                  </p>
-                  {category.rules && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      <Badge>
-                        {category.rules.pointsWin}/{category.rules.pointsDraw}/{category.rules.pointsLoss} pts
-                      </Badge>
-                      {category.rules.tiebreakerCriteria.map((c, i) => (
-                        <Badge key={c}>
-                          {i + 1}. {TIEBREAKER_LABEL[c] ?? c}
+    <>
+      <div className="grid gap-8 lg:grid-cols-[1fr_24rem]">
+        <div>
+          <SectionTitle title="Categorías" description="Cada categoría tiene su rango de edad (elegibilidad) y su propio reglamento." />
+          {league.categories.length === 0 ? (
+            <EmptyState title="Aún no hay categorías" description="Por ejemplo: Libre, Sub-17, Femenino." />
+          ) : (
+            <div className="space-y-3">
+              {league.categories.map((category) => (
+                <Card key={category.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{category.name}</p>
+                    <p className="mt-0.5 text-xs text-muted">
+                      {category.minAge !== null || category.maxAge !== null
+                        ? `Edad ${category.minAge ?? 'sin mínimo'} – ${category.maxAge ?? 'sin máximo'}`
+                        : 'Sin límite de edad'}
+                    </p>
+                    {category.rules && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <Badge>
+                          {category.rules.pointsWin}/{category.rules.pointsDraw}/{category.rules.pointsLoss} pts
                         </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    setEditing(category);
-                    setEditRules(category.rules ?? DEFAULT_RULES[league.sport]);
-                  }}
-                >
-                  Editar reglamento
-                </Button>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <form onSubmit={submit} className="space-y-4">
-        <SectionTitle title="Nueva categoría" />
-        <Field label="Nombre">
-          <Input required minLength={2} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Libre" />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Edad mínima">
-            <Input type="number" min={0} max={99} value={form.minAge} onChange={(e) => setForm((f) => ({ ...f, minAge: e.target.value }))} />
-          </Field>
-          <Field label="Edad máxima">
-            <Input type="number" min={0} max={99} value={form.maxAge} onChange={(e) => setForm((f) => ({ ...f, maxAge: e.target.value }))} />
-          </Field>
+                        {category.rules.tiebreakerCriteria.map((c, i) => (
+                          <Badge key={c}>
+                            {i + 1}. {TIEBREAKER_LABEL[c] ?? c}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setEditing(category);
+                      setEditRules(category.rules ?? DEFAULT_RULES[league.sport]);
+                    }}
+                  >
+                    Editar reglamento
+                  </Button>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
-        <RulesEditor value={rules} onChange={setRules} />
-        <Button type="submit" loading={busy}>
-          Crear categoría
-        </Button>
-      </form>
 
-      <Modal
-        open={!!editing}
-        onClose={() => setEditing(null)}
-        title={`Reglamento · ${editing?.name ?? ''}`}
-        description="Al guardar, el Statistics Service recalcula la tabla de posiciones de forma idempotente."
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setEditing(null)}>
-              Cancelar
-            </Button>
-            <Button onClick={saveRules}>Guardar</Button>
-          </>
-        }
-      >
-        <RulesEditor value={editRules} onChange={setEditRules} />
-      </Modal>
-    </div>
+        <form onSubmit={submit} className="space-y-4">
+          <SectionTitle title="Nueva categoría" />
+          <Field label="Nombre">
+            <Input required minLength={2} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Libre" />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Edad mínima">
+              <Input type="number" min={0} max={99} value={form.minAge} onChange={(e) => setForm((f) => ({ ...f, minAge: e.target.value }))} />
+            </Field>
+            <Field label="Edad máxima">
+              <Input type="number" min={0} max={99} value={form.maxAge} onChange={(e) => setForm((f) => ({ ...f, maxAge: e.target.value }))} />
+            </Field>
+          </div>
+          <RulesEditor value={rules} onChange={setRules} />
+          <Button type="submit" loading={busy}>
+            Crear categoría
+          </Button>
+        </form>
+
+        <Modal
+          open={!!editing}
+          onClose={() => setEditing(null)}
+          title={`Reglamento · ${editing?.name ?? ''}`}
+          description="Al guardar, el Statistics Service recalcula la tabla de posiciones de forma idempotente."
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setEditing(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={saveRules}>Guardar</Button>
+            </>
+          }
+        >
+          <RulesEditor value={editRules} onChange={setEditRules} />
+        </Modal>
+      </div>
+      <StepNavigation step="categorias" />
+    </>
   );
 }

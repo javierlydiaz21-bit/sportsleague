@@ -9,6 +9,7 @@ import type { Player, Team } from '@/lib/types';
 import { Modal, useToast } from '../../overlay';
 import { Badge, Button, Card, EmptyState, Field, Input, Notice, Pills, SectionTitle, Select, Table, TeamBadge, Td, Textarea, Th, cn } from '../../ui';
 import type { LeagueTabProps } from '../league-manager';
+import { StepNavigation, useSetup, useUnsavedChanges } from './setup-flow';
 
 const ELIGIBILITY = {
   ELIGIBLE: { label: 'Habilitado', tone: 'green' },
@@ -42,6 +43,7 @@ function Roster({ team, onChanged }: { team: Team; onChanged: () => void }) {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulk, setBulk] = useState('');
   const [busy, setBusy] = useState(false);
+  const markSaved = useUnsavedChanges(form);
 
   const add = async (event: FormEvent) => {
     event.preventDefault();
@@ -56,6 +58,7 @@ function Roster({ team, onChanged }: { team: Team; onChanged: () => void }) {
         ...(form.documentId ? { documentId: form.documentId } : {}),
       });
       setForm({ firstName: '', lastName: '', birthDate: '', jerseyNumber: '', position: '', documentId: '' });
+      markSaved();
       await reload();
       onChanged();
       if (player.eligibilityStatus === 'INELIGIBLE') toast.error(`Jugador inscrito, pero no elegible: ${player.eligibilityNote}`);
@@ -219,9 +222,16 @@ export function TeamsTab({ league }: LeagueTabProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', coachName: '', contactEmail: '', homeVenueId: '' });
   const [busy, setBusy] = useState(false);
+  const { refreshProgress } = useSetup();
+  const markSaved = useUnsavedChanges(form);
 
   if (league.categories.length === 0) {
-    return <EmptyState title="Primero crea una categoría" description="Los equipos se inscriben dentro de una categoría." />;
+    return (
+      <>
+        <EmptyState title="Primero crea una categoría" description="Los equipos se inscriben dentro de una categoría." />
+        <StepNavigation step="equipos" />
+      </>
+    );
   }
   const category = league.categories.find((c) => c.id === categoryId);
   const selectedTeam = teams?.find((t) => t.id === selected);
@@ -238,7 +248,9 @@ export function TeamsTab({ league }: LeagueTabProps) {
         ...(form.homeVenueId ? { homeVenueId: form.homeVenueId } : {}),
       });
       setForm({ name: '', coachName: '', contactEmail: '', homeVenueId: '' });
+      markSaved();
       await reload();
+      void refreshProgress();
       setSelected(team.id);
       toast.success('Equipo inscrito');
     } catch (err) {
@@ -254,83 +266,87 @@ export function TeamsTab({ league }: LeagueTabProps) {
       await api.del(`/teams/${team.id}`);
       setSelected(null);
       await reload();
+      void refreshProgress();
     } catch (err) {
       toast.error(errorMessage(err));
     }
   };
 
   return (
-    <div className="space-y-6">
-      <Pills options={league.categories.map((c) => ({ value: c.id, label: c.name }))} value={categoryId} onChange={(id) => { setCategoryId(id); setSelected(null); }} />
-      {category && (category.minAge !== null || category.maxAge !== null) && (
-        <Notice>
-          Elegibilidad de {category.name}: entre {category.minAge ?? '—'} y {category.maxAge ?? '—'} años. El Team Service la valida automáticamente
-          consultando al League Service.
-        </Notice>
-      )}
-      <div className="grid gap-8 lg:grid-cols-[18rem_1fr]">
-        <div className="space-y-4">
-          <SectionTitle title={`Equipos (${teams?.length ?? 0})`} />
-          <Card className="divide-y divide-line overflow-hidden">
-            {(teams ?? []).map((team) => (
-              <button
-                key={team.id}
-                type="button"
-                onClick={() => setSelected(team.id)}
-                className={cn('flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-surface', selected === team.id && 'bg-surface')}
-              >
-                <TeamBadge name={team.name} color={team.color} size="sm" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{team.name}</span>
-                  <span className="text-xs text-muted">{team._count?.players ?? 0} jugadores</span>
-                </span>
-              </button>
-            ))}
-            {teams?.length === 0 && <p className="px-4 py-6 text-center text-sm text-muted">Sin equipos todavía</p>}
-          </Card>
-          <form onSubmit={create} className="space-y-3">
-            <Field label="Nuevo equipo">
-              <Input required minLength={2} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Nombre del equipo" />
-            </Field>
-            <Input value={form.coachName} onChange={(e) => setForm((f) => ({ ...f, coachName: e.target.value }))} placeholder="Entrenador (opcional)" />
-            <Input type="email" value={form.contactEmail} onChange={(e) => setForm((f) => ({ ...f, contactEmail: e.target.value }))} placeholder="Correo de contacto (opcional)" />
-            <Select value={form.homeVenueId} onChange={(e) => setForm((f) => ({ ...f, homeVenueId: e.target.value }))}>
-              <option value="">Sin cancha propia</option>
-              {league.venues.map((venue) => (
-                <option key={venue.id} value={venue.id}>
-                  Cancha propia: {venue.name}
-                </option>
+    <>
+      <div className="space-y-6">
+        <Pills options={league.categories.map((c) => ({ value: c.id, label: c.name }))} value={categoryId} onChange={(id) => { setCategoryId(id); setSelected(null); }} />
+        {category && (category.minAge !== null || category.maxAge !== null) && (
+          <Notice>
+            Elegibilidad de {category.name}: entre {category.minAge ?? '—'} y {category.maxAge ?? '—'} años. El Team Service la valida automáticamente
+            consultando al League Service.
+          </Notice>
+        )}
+        <div className="grid gap-8 lg:grid-cols-[18rem_1fr]">
+          <div className="space-y-4">
+            <SectionTitle title={`Equipos (${teams?.length ?? 0})`} />
+            <Card className="divide-y divide-line overflow-hidden">
+              {(teams ?? []).map((team) => (
+                <button
+                  key={team.id}
+                  type="button"
+                  onClick={() => setSelected(team.id)}
+                  className={cn('flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-surface', selected === team.id && 'bg-surface')}
+                >
+                  <TeamBadge name={team.name} color={team.color} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{team.name}</span>
+                    <span className="text-xs text-muted">{team._count?.players ?? 0} jugadores</span>
+                  </span>
+                </button>
               ))}
-            </Select>
-            <Button type="submit" loading={busy} className="w-full">
-              Inscribir equipo
-            </Button>
-          </form>
-        </div>
-        <div>
-          {selectedTeam ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <TeamBadge name={selectedTeam.name} color={selectedTeam.color} />
-                  <div>
-                    <p className="font-semibold">{selectedTeam.name}</p>
-                    <p className="text-xs text-muted">
-                      {[selectedTeam.coachName && `DT ${selectedTeam.coachName}`, selectedTeam.contactEmail].filter(Boolean).join(' · ') || 'Plantilla'}
-                    </p>
+              {teams?.length === 0 && <p className="px-4 py-6 text-center text-sm text-muted">Sin equipos todavía</p>}
+            </Card>
+            <form onSubmit={create} className="space-y-3">
+              <Field label="Nuevo equipo">
+                <Input required minLength={2} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Nombre del equipo" />
+              </Field>
+              <Input value={form.coachName} onChange={(e) => setForm((f) => ({ ...f, coachName: e.target.value }))} placeholder="Entrenador (opcional)" />
+              <Input type="email" value={form.contactEmail} onChange={(e) => setForm((f) => ({ ...f, contactEmail: e.target.value }))} placeholder="Correo de contacto (opcional)" />
+              <Select value={form.homeVenueId} onChange={(e) => setForm((f) => ({ ...f, homeVenueId: e.target.value }))}>
+                <option value="">Sin cancha propia</option>
+                {league.venues.map((venue) => (
+                  <option key={venue.id} value={venue.id}>
+                    Cancha propia: {venue.name}
+                  </option>
+                ))}
+              </Select>
+              <Button type="submit" loading={busy} className="w-full">
+                Inscribir equipo
+              </Button>
+            </form>
+          </div>
+          <div>
+            {selectedTeam ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <TeamBadge name={selectedTeam.name} color={selectedTeam.color} />
+                    <div>
+                      <p className="font-semibold">{selectedTeam.name}</p>
+                      <p className="text-xs text-muted">
+                        {[selectedTeam.coachName && `DT ${selectedTeam.coachName}`, selectedTeam.contactEmail].filter(Boolean).join(' · ') || 'Plantilla'}
+                      </p>
+                    </div>
                   </div>
+                  <Button variant="danger" size="sm" onClick={() => removeTeam(selectedTeam)}>
+                    Eliminar equipo
+                  </Button>
                 </div>
-                <Button variant="danger" size="sm" onClick={() => removeTeam(selectedTeam)}>
-                  Eliminar equipo
-                </Button>
+                <Roster team={selectedTeam} onChanged={() => void reload()} />
               </div>
-              <Roster team={selectedTeam} onChanged={() => void reload()} />
-            </div>
-          ) : (
-            <EmptyState title="Selecciona un equipo" description="Verás su plantilla, la elegibilidad de cada jugador y podrás inscribir más." />
-          )}
+            ) : (
+              <EmptyState title="Selecciona un equipo" description="Verás su plantilla, la elegibilidad de cada jugador y podrás inscribir más." />
+            )}
+          </div>
         </div>
       </div>
-    </div>
+      <StepNavigation step="equipos" />
+    </>
   );
 }

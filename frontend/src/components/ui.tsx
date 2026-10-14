@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import Link from 'next/link';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { initials } from '@/lib/format';
@@ -244,6 +245,8 @@ export interface TabItem {
   key: string;
   label: string;
   count?: number;
+  /** Muestra un check junto al nombre (p. ej. paso completo del flujo de una liga). */
+  done?: boolean;
 }
 
 /** Pestañas minimalistas (subrayado). Con `hrefFor` funcionan como enlaces (sirven en SSR). */
@@ -271,6 +274,12 @@ export function Tabs({
             <>
               {tab.label}
               {tab.count !== undefined && <span className="ml-1.5 text-xs text-subtle">{tab.count}</span>}
+              {tab.done && (
+                <>
+                  <Check aria-hidden className="ml-1 inline h-3.5 w-3.5 -translate-y-px text-brand" strokeWidth={3} />
+                  <span className="sr-only"> (completo)</span>
+                </>
+              )}
             </>
           );
           return hrefFor ? (
