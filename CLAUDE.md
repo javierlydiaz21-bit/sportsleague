@@ -22,8 +22,8 @@ microservicios independientes. El README.md documenta todo; aquí van solo la es
   Repositorio: github.com/javierlydiaz21-bit/sportsleague. Imágenes:
   `ghcr.io/javierlydiaz21-bit/sportsleague-app-<servicio>`. No uses `sportsleague-<servicio>`:
   esos paquetes son del proyecto anterior (`sportsleague-ms`) y este repo no puede escribir en ellos.
-  Render y Vercel NO están desplegados: el usuario decidió no pagar (Render exige planes de pago
-  para esta arquitectura). No propongas servicios de pago.
+  El usuario no paga servicios: el despliegue usa `render-free.yaml` (Render Free) y Vercel Hobby;
+  `render.yaml` (de pago) queda como referencia. No propongas servicios de pago.
 
 ## Arrancar y verificar
 

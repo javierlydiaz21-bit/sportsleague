@@ -1,0 +1,288 @@
+# Blueprint GRATUITO de Render (plan Free): variante de render.yaml para demostraciones sin costo.
+# Usa las mismas imágenes de GHCR (públicas) que publica GitHub Actions.
+#
+#   Render → New → Blueprint → este repositorio → Blueprint Path: render-free.yaml
+#   Solo pide ADMIN_PASSWORD (contraseña del administrador de producción).
+#
+# Diferencias con render.yaml impuestas por el plan Free (https://render.com/docs/free):
+#   - Los 10 microservicios son servicios web públicos: el plan Free no admite servicios privados
+#     y sus servicios web no reciben tráfico de la red privada. Se llaman entre sí por HTTPS con
+#     su URL pública; todos exigen el token interno (x-internal-token), así que nadie de fuera
+#     puede usar sus rutas internas.
+#   - Una sola PostgreSQL gratuita (máximo una por workspace) con UNA BASE POR SERVICIO:
+#     DATABASE_NAME indica la base y Prisma la crea en el primer arranque. Todas usan el mismo
+#     usuario; Analytics lee las bases de Fixture, Live Score y Statistics de la misma instancia.
+#   - Un solo Key Value gratuito (25 MB, 50 conexiones; la demo completa usa ~2 MB y ~21).
+#
+# Límites del plan Free:
+#   - Cada servicio se duerme tras 15 min sin tráfico y tarda ~1 min en despertar. Antes de una
+#     demostración abre Administración → Sistema y espera a que los 10 servicios estén en verde.
+#   - 750 horas de instancia al mes para todo el workspace (10 servicios despiertos = 10 h por hora).
+#   - La PostgreSQL gratuita caduca a los 30 días de crearla y se borra 14 días después.
+#
+# Las URLs públicas asumen que Render asigna https://<nombre>.onrender.com. Si añade un sufijo
+# porque el nombre ya existe, corrige aquí las variables *_SERVICE_URL y haz push (Render
+# sincroniza el blueprint), y actualiza NEXT_PUBLIC_* en Vercel.
+
+envVarGroups:
+  - name: sportsleague-free-shared
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: INTERNAL_API_TOKEN
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: LEAGUE_UTC_OFFSET
+        value: "-05:00"
+      - key: LEAGUE_TIMEZONE
+        value: America/Bogota
+
+services:
+  - type: keyvalue
+    name: sportsleague-jd-redis
+    plan: free
+    region: virginia
+    ipAllowList: [] # solo red privada
+    maxmemoryPolicy: allkeys-lru # con 25 MB, mejor desalojar caché que rechazar escrituras
+
+  - type: web
+    name: sportsleague-jd-gateway
+    runtime: image
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-api-gateway:latest }
+    plan: free
+    region: virginia
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: sportsleague-free-shared
+      - key: PORT
+        value: "4000"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: CORS_ORIGINS
+        value: https://sportsleague-jd.vercel.app
+      - key: REDIS_URL
+        fromService: { type: keyvalue, name: sportsleague-jd-redis, property: connectionString }
+      - key: AUTH_SERVICE_URL
+        value: https://sportsleague-jd-auth.onrender.com
+      - key: LEAGUE_SERVICE_URL
+        value: https://sportsleague-jd-league.onrender.com
+      - key: TEAM_SERVICE_URL
+        value: https://sportsleague-jd-team.onrender.com
+      - key: FIXTURE_SERVICE_URL
+        value: https://sportsleague-jd-fixture.onrender.com
+      - key: REFEREE_SERVICE_URL
+        value: https://sportsleague-jd-referee.onrender.com
+      - key: LIVE_SCORE_SERVICE_URL
+        value: https://sportsleague-jd-live.onrender.com
+      - key: STATISTICS_SERVICE_URL
+        value: https://sportsleague-jd-statistics.onrender.com
+      - key: NOTIFICATION_SERVICE_URL
+        value: https://sportsleague-jd-notification.onrender.com
+      - key: ANALYTICS_SERVICE_URL
+        value: https://sportsleague-jd-analytics.onrender.com
+
+  - type: web
+    name: sportsleague-jd-auth
+    runtime: image
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-auth-service:latest }
+    plan: free
+    region: virginia
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: sportsleague-free-shared
+      - key: PORT
+        value: "4001"
+      - key: DATABASE_URL
+        fromDatabase: { name: sportsleague-jd-db, property: connectionString }
+      - key: DATABASE_NAME
+        value: auth_db?connection_limit=5
+      - key: REDIS_URL
+        fromService: { type: keyvalue, name: sportsleague-jd-redis, property: connectionString }
+      - key: ADMIN_EMAIL
+        value: admin@sportsleague.com
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAMESITE
+        value: none
+
+  - type: web
+    name: sportsleague-jd-league
+    runtime: image
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-league-service:latest }
+    plan: free
+    region: virginia
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: sportsleague-free-shared
+      - key: PORT
+        value: "4002"
+      - key: DATABASE_URL
+        fromDatabase: { name: sportsleague-jd-db, property: connectionString }
+      - key: DATABASE_NAME
+        value: league_db?connection_limit=5
+      - key: REDIS_URL
+        fromService: { type: keyvalue, name: sportsleague-jd-redis, property: connectionString }
+
+  - type: web
+    name: sportsleague-jd-team
+    runtime: image
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-team-service:latest }
+    plan: free
+    region: virginia
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: sportsleague-free-shared
+      - key: PORT
+        value: "4003"
+      - key: DATABASE_URL
+        fromDatabase: { name: sportsleague-jd-db, property: connectionString }
+      - key: DATABASE_NAME
+        value: team_db?connection_limit=5
+      - key: REDIS_URL
+        fromService: { type: keyvalue, name: sportsleague-jd-redis, property: connectionString }
+      - key: LEAGUE_SERVICE_URL
+        value: https://sportsleague-jd-league.onrender.com
+
+  - type: web
+    name: sportsleague-jd-fixture
+    runtime: image
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-fixture-service:latest }
+    plan: free
+    region: virginia
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: sportsleague-free-shared
+      - key: PORT
+        value: "4004"
+      - key: DATABASE_URL
+        fromDatabase: { name: sportsleague-jd-db, property: connectionString }
+      - key: DATABASE_NAME
+        value: fixture_db?connection_limit=5
+      - key: REDIS_URL
+        fromService: { type: keyvalue, name: sportsleague-jd-redis, property: connectionString }
+      - key: LEAGUE_SERVICE_URL
+        value: https://sportsleague-jd-league.onrender.com
+      - key: TEAM_SERVICE_URL
+        value: https://sportsleague-jd-team.onrender.com
+
+  - type: web
+    name: sportsleague-jd-referee
+    runtime: image
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-referee-service:latest }
+    plan: free
+    region: virginia
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: sportsleague-free-shared
+      - key: PORT
+        value: "4005"
+      - key: DATABASE_URL
+        fromDatabase: { name: sportsleague-jd-db, property: connectionString }
+      - key: DATABASE_NAME
+        value: referee_db?connection_limit=5
+      - key: REDIS_URL
+        fromService: { type: keyvalue, name: sportsleague-jd-redis, property: connectionString }
+
+  - type: web
+    name: sportsleague-jd-live
+    runtime: image
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-live-score-service:latest }
+    plan: free
+    region: virginia
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: sportsleague-free-shared
+      - key: PORT
+        value: "4006"
+      - key: DATABASE_URL
+        fromDatabase: { name: sportsleague-jd-db, property: connectionString }
+      - key: DATABASE_NAME
+        value: livescore_db?connection_limit=5
+      - key: REDIS_URL
+        fromService: { type: keyvalue, name: sportsleague-jd-redis, property: connectionString }
+      - key: FIXTURE_SERVICE_URL
+        value: https://sportsleague-jd-fixture.onrender.com
+      - key: REFEREE_SERVICE_URL
+        value: https://sportsleague-jd-referee.onrender.com
+      - key: TEAM_SERVICE_URL
+        value: https://sportsleague-jd-team.onrender.com
+      - key: WS_ALLOWED_ORIGINS
+        value: https://sportsleague-jd.vercel.app
+
+  - type: web
+    name: sportsleague-jd-statistics
+    runtime: image
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-statistics-service:latest }
+    plan: free
+    region: virginia
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: sportsleague-free-shared
+      - key: PORT
+        value: "4007"
+      - key: DATABASE_URL
+        fromDatabase: { name: sportsleague-jd-db, property: connectionString }
+      - key: DATABASE_NAME
+        value: statistics_db?connection_limit=5
+      - key: REDIS_URL
+        fromService: { type: keyvalue, name: sportsleague-jd-redis, property: connectionString }
+      - key: LEAGUE_SERVICE_URL
+        value: https://sportsleague-jd-league.onrender.com
+      - key: LIVE_SCORE_SERVICE_URL
+        value: https://sportsleague-jd-live.onrender.com
+
+  - type: web
+    name: sportsleague-jd-notification
+    runtime: image
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-notification-service:latest }
+    plan: free
+    region: virginia
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: sportsleague-free-shared
+      - key: PORT
+        value: "4008"
+      - key: DATABASE_URL
+        fromDatabase: { name: sportsleague-jd-db, property: connectionString }
+      - key: DATABASE_NAME
+        value: notification_db?connection_limit=5
+      - key: REDIS_URL
+        fromService: { type: keyvalue, name: sportsleague-jd-redis, property: connectionString }
+      - key: TEAM_SERVICE_URL
+        value: https://sportsleague-jd-team.onrender.com
+
+  - type: web
+    name: sportsleague-jd-analytics
+    runtime: image
+    image: { url: ghcr.io/javierlydiaz21-bit/sportsleague-app-analytics-service:latest }
+    plan: free
+    region: virginia
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: sportsleague-free-shared
+      - key: PORT
+        value: "4009"
+      - key: DATABASE_URL
+        fromDatabase: { name: sportsleague-jd-db, property: connectionString }
+      - key: DATABASE_NAME
+        value: analytics_db?connection_limit=5
+      - key: REDIS_URL
+        fromService: { type: keyvalue, name: sportsleague-jd-redis, property: connectionString }
+      # Solo el nombre de la base: misma instancia que DATABASE_URL (ver replica-url.ts)
+      - key: FIXTURE_REPLICA_URL
+        value: fixture_db
+      - key: LIVESCORE_REPLICA_URL
+        value: livescore_db
+      - key: STATISTICS_REPLICA_URL
+        value: statistics_db
+
+databases:
+  - name: sportsleague-jd-db
+    plan: free
+    region: virginia
+    databaseName: sportsleague
+    user: sportsleague
+    ipAllowList: [] # solo red privada

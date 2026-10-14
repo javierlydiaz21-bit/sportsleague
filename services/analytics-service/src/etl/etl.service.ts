@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import { Counter, Histogram } from 'prom-client';
 import { RedisService, envInt, log, registry } from '../chassis';
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveReplicaUrl } from './replica-url';
 import {
   buildAttendance,
   buildLeagueKpis,
@@ -40,10 +41,11 @@ export class EtlService implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
   ) {
+    const primary = process.env.DATABASE_URL;
     const urls: Record<ReplicaName, string | undefined> = {
-      fixture: process.env.FIXTURE_REPLICA_URL,
-      livescore: process.env.LIVESCORE_REPLICA_URL,
-      statistics: process.env.STATISTICS_REPLICA_URL,
+      fixture: resolveReplicaUrl(process.env.FIXTURE_REPLICA_URL, primary),
+      livescore: resolveReplicaUrl(process.env.LIVESCORE_REPLICA_URL, primary),
+      statistics: resolveReplicaUrl(process.env.STATISTICS_REPLICA_URL, primary),
     };
     for (const [name, url] of Object.entries(urls) as [ReplicaName, string | undefined][]) {
       if (url) this.replicas.set(name, new Pool({ connectionString: url, max: 2, statement_timeout: 15_000 }));

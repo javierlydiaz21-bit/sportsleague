@@ -27,4 +27,6 @@ EXPOSE 4001
 HEALTHCHECK --interval=15s --timeout=3s --start-period=40s --retries=3 \
   CMD wget -qO- "http://127.0.0.1:${PORT}/health" > /dev/null || exit 1
 # Las migraciones de Prisma se aplican antes de que el contenedor reciba tráfico.
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+# DATABASE_NAME (opcional, render-free.yaml): usa otra base de la misma instancia de DATABASE_URL;
+# Prisma la crea si no existe.
+CMD ["sh", "-c", "[ -z \"$DATABASE_NAME\" ] || export DATABASE_URL=\"${DATABASE_URL%/*}/$DATABASE_NAME\"; npx prisma migrate deploy && node dist/main.js"]

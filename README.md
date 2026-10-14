@@ -292,7 +292,8 @@ infra/                   PostgreSQL (una base por servicio), Prometheus, Grafana
 load-tests/              k6: varias jornadas en simultáneo contra Live Score
 scripts/                 seed-demo.mjs, sync-chassis.mjs
 .github/workflows/       un pipeline por servicio + pipeline reutilizable + frontend
-render.yaml              blueprint de despliegue en Render (referencia)
+render.yaml              blueprint de despliegue en Render (referencia, planes de pago)
+render-free.yaml         variante gratuita (Render Free) para demostraciones
 iniciar.bat / .ps1 / .sh arranque en un clic (construye, arranca, carga la demo)
 detener.bat              detiene los contenedores conservando los datos
 ```
@@ -367,11 +368,51 @@ npm run start:dev
   Vercel con su integración de GitHub (preview por Pull Request). Variables en Vercel:
   `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`, `API_INTERNAL_URL`.
 - `render.yaml`: blueprint de referencia con los 10 servicios (gateway y Live Score públicos, el
-  resto privados), 9 bases de datos y Redis (Key Value). Requiere planes de pago de Render: el
-  plan gratuito no incluye servicios privados ni varias bases PostgreSQL. Por eso no está
-  desplegado; la plataforma se demuestra en local con Docker Compose, y GitHub Actions publica
-  igualmente las imágenes en GHCR (el paso de despliegue se omite sin los secretos de Render).
+  resto privados), 9 bases de datos y Redis (Key Value). Requiere planes de pago de Render.
+- `render-free.yaml`: variante **gratuita** para demostraciones (ver la sección siguiente).
 - Flujo Git: `feature/*` → `develop` → `main`, `hotfix/*` desde `main`; PR con revisión y checks en verde.
+
+### Despliegue gratuito (Render Free + Vercel Hobby)
+
+El plan gratuito de Render no admite servicios privados, sus servicios web no reciben tráfico de
+la red privada y solo permite una PostgreSQL y un Key Value por workspace. `render-free.yaml` se
+adapta así, con las mismas imágenes de GHCR:
+
+- Los 10 microservicios son servicios web públicos que se llaman entre sí por HTTPS; todos exigen
+  el token interno (`x-internal-token`), así que sus rutas internas no se pueden usar desde fuera.
+- Una sola PostgreSQL con **una base por servicio**: la variable `DATABASE_NAME` elige la base de
+  la misma instancia y Prisma la crea en el primer arranque (sin esa variable, como en Docker
+  Compose, no cambia nada). Todas las bases comparten usuario y Analytics lee las de Fixture,
+  Live Score y Statistics por su nombre (`FIXTURE_REPLICA_URL=fixture_db`).
+- `JWT_SECRET` e `INTERNAL_API_TOKEN` los genera Render; solo se pide `ADMIN_PASSWORD`.
+
+Pasos:
+
+1. Render → **New → Blueprint** → este repositorio → *Blueprint Path*: `render-free.yaml` → escribe
+   la contraseña del administrador → *Apply*. No pide tarjeta.
+2. Vercel → **Add New → Project** → importa el repositorio → nombre del proyecto `sportsleague-jd`,
+   *Root Directory* `frontend` y estas variables:
+   `NEXT_PUBLIC_API_URL` y `API_INTERNAL_URL` = `https://sportsleague-jd-gateway.onrender.com`,
+   `NEXT_PUBLIC_WS_URL` = `https://sportsleague-jd-live.onrender.com`.
+3. Si Render o Vercel asignan otra URL (añaden un sufijo cuando el nombre ya existe), corrige las
+   URLs de `render-free.yaml` (`*_SERVICE_URL`, `CORS_ORIGINS`, `WS_ALLOWED_ORIGINS`) y haz push:
+   Render sincroniza el blueprint. Si cambia la del gateway o la del WebSocket, actualiza también
+   las variables de Vercel y vuelve a desplegar la web.
+4. Datos de demostración (desde cualquier equipo con Node 18+, en la carpeta del proyecto):
+   - PowerShell: `$env:API_URL='https://sportsleague-jd-gateway.onrender.com'; $env:ADMIN_PASSWORD='<la del paso 1>'; node scripts/seed-demo.mjs`
+   - Bash: `API_URL=https://sportsleague-jd-gateway.onrender.com ADMIN_PASSWORD='<la del paso 1>' node scripts/seed-demo.mjs`
+
+Límites del plan gratuito:
+
+- Cada servicio **se duerme tras 15 minutos sin tráfico** y tarda ~1 minuto en despertar. Antes de
+  una demostración entra como admin en *Administración → Sistema* y espera a que los 10 servicios
+  estén en verde (esa pantalla los consulta cada 10 s y los mantiene despiertos). Un servicio
+  dormido no recibe los eventos de Redis; si falta algo en la tabla, usa *Recalcular*.
+- 750 horas de instancia al mes para todo el workspace (10 servicios despiertos gastan 10 h por hora).
+- La PostgreSQL gratuita **caduca a los 30 días** y se borra 14 días después: crea el blueprint
+  pocos días antes de la presentación.
+- En Safari, la sesión no sobrevive a una recarga de la página: bloquea la cookie de sesión
+  (otro dominio, `onrender.com`) y hay que volver a iniciar sesión.
 
 ---
 
