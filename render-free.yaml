@@ -60,7 +60,7 @@ services:
       - key: TRUST_PROXY
         value: "1"
       - key: CORS_ORIGINS
-        value: https://sportsleague-jd.vercel.app
+        value: https://sportsleague-cyan.vercel.app
       - key: REDIS_URL
         fromService: { type: keyvalue, name: sportsleague-jd-redis, property: connectionString }
       - key: AUTH_SERVICE_URL
@@ -210,7 +210,7 @@ services:
       - key: TEAM_SERVICE_URL
         value: https://sportsleague-jd-team.onrender.com
       - key: WS_ALLOWED_ORIGINS
-        value: https://sportsleague-jd.vercel.app
+        value: https://sportsleague-cyan.vercel.app
 
   - type: web
     name: sportsleague-jd-statistics

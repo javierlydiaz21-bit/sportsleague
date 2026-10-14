@@ -390,8 +390,8 @@ Pasos:
 
 1. Render → **New → Blueprint** → este repositorio → *Blueprint Path*: `render-free.yaml` → escribe
    la contraseña del administrador → *Apply*. No pide tarjeta.
-2. Vercel → **Add New → Project** → importa el repositorio → nombre del proyecto `sportsleague-jd`,
-   *Root Directory* `frontend` y estas variables:
+2. Vercel → **Add New → Project** → importa el repositorio → *Root Directory* `frontend`
+   (preset Next.js) y estas variables (la web publicada está en https://sportsleague-cyan.vercel.app):
    `NEXT_PUBLIC_API_URL` y `API_INTERNAL_URL` = `https://sportsleague-jd-gateway.onrender.com`,
    `NEXT_PUBLIC_WS_URL` = `https://sportsleague-jd-live.onrender.com`.
 3. Si Render o Vercel asignan otra URL (añaden un sufijo cuando el nombre ya existe), corrige las
