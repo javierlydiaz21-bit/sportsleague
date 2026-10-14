@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { HeroActions } from './hero-actions';
 import { DivisionConnector, SportBall, SportEmblem, type Sport } from './sport-art';
 
 const SPORTS: { sport: Sport; label: string }[] = [
@@ -36,12 +36,7 @@ export function HomeHero() {
           </span>
         </p>
 
-        <Link
-          href="/ligas"
-          className="mt-[clamp(1.25rem,3.6vh,2.25rem)] rounded-md border-2 border-white px-8 py-3 text-sm font-semibold uppercase tracking-[0.12em] transition hover:bg-white hover:text-[#5a1428] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:text-[15px]"
-        >
-          Explorar ligas
-        </Link>
+        <HeroActions className="mt-[clamp(1.25rem,3.6vh,2.25rem)]" />
 
         <div className="mt-[clamp(1.5rem,8vh,5rem)] w-full max-w-[600px] sm:mt-[clamp(1.5rem,4.5vh,4.5rem)]">
           <ul className="grid grid-cols-3">
