@@ -15,8 +15,9 @@
 #   - Un solo Key Value gratuito (25 MB, 50 conexiones; la demo completa usa ~2 MB y ~21).
 #
 # Límites del plan Free:
-#   - Cada servicio se duerme tras 15 min sin tráfico y tarda ~1 min en despertar. Antes de una
-#     demostración abre Administración → Sistema y espera a que los 10 servicios estén en verde.
+#   - Cada servicio se duerme tras 15 min sin tráfico y tarda ~1 min en despertar. El despertador
+#     del gateway (WAKE_SERVICES) los despierta a todos en cuanto alguien abre la web, y el gateway
+#     espera hasta 60 s (PROXY_TIMEOUT_MS) a un servicio que se está despertando.
 #   - 750 horas de instancia al mes para todo el workspace (10 servicios despiertos = 10 h por hora).
 #   - La PostgreSQL gratuita caduca a los 30 días de crearla y se borra 14 días después.
 #
@@ -59,6 +60,11 @@ services:
         value: "4000"
       - key: TRUST_PROXY
         value: "1"
+      # Despertador del plan gratuito (src/gateway/wake.ts)
+      - key: WAKE_SERVICES
+        value: "true"
+      - key: PROXY_TIMEOUT_MS
+        value: "60000"
       - key: CORS_ORIGINS
         value: https://sportsleague-cyan.vercel.app
       - key: REDIS_URL
