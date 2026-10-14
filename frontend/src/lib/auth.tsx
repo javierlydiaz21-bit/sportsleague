@@ -41,6 +41,11 @@ function readCsrf(): string | null {
   }
 }
 
+/** Hay rastro de una sesión iniciada en este navegador (se confirma al renovarla). */
+export function hasStoredSession(): boolean {
+  return readCsrf() !== null;
+}
+
 function writeCsrf(value: string | null): void {
   try {
     if (value) localStorage.setItem(CSRF_KEY, value);

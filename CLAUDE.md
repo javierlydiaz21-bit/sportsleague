@@ -13,6 +13,9 @@ microservicios independientes. El README.md documenta todo; aquí van solo la es
   Edita siempre `chassis/` y sincroniza; nunca edites solo una copia.
 - `frontend/`: Next.js 15 (output standalone) + Tailwind 4, puerto 3000. Las `NEXT_PUBLIC_*` se
   incrustan al construir la imagen; el SSR usa `API_INTERNAL_URL=http://api-gateway:4000`.
+  - Sin sesión, `/` y `/ligas` muestran `components/LandingSimulator.tsx` y `components/LigasPublicas.tsx`
+    (componentes del usuario; `LigasPublicas` va sin datos por decisión suya). `SessionGate` elige la
+    vista con `useAuth()`; con sesión se ven las páginas de siempre. `SimuladorLigas.tsx` se conserva sin uso.
 - `infra/postgres/init/01-databases.sh`: 9 bases, un usuario por servicio y `analytics_ro` (solo
   lectura). Solo corre con el volumen `pgdata` nuevo: si lo cambias, `docker compose down -v`.
 - `infra/prometheus`, `infra/grafana`: observabilidad (Prometheus 9090, Grafana 3100 admin/admin).

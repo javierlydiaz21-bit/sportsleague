@@ -3,9 +3,7 @@
 /* Diseño minimalista: neutros, mucho aire, un acento verde y rojo solo para "en vivo". */
 @theme inline {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --font-display: var(--font-anton), Impact, 'Arial Narrow', sans-serif;
-  --color-bg: var(--bg);
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;  --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-elevated: var(--elevated);
   --color-fg: var(--fg);
@@ -78,6 +76,9 @@ body {
 }
 
 body {
+  /* Las vistas públicas (LandingSimulator, LigasPublicas) usan w-screen: 100vw incluye la barra de
+     desplazamiento vertical y, sin esto, aparecería una barra de desplazamiento horizontal. */
+  overflow-x: clip;
   font-feature-settings: 'cv11', 'ss01';
   -webkit-font-smoothing: antialiased;
 }

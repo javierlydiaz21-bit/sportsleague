@@ -51,7 +51,9 @@ export function Navbar() {
 
   useEffect(() => setOpen(false), [pathname]);
 
-  const links: { href: string; label: string }[] = [{ href: '/ligas', label: 'Ligas' }];
+  const links: { href: string; label: string }[] = [];
+  // Sin sesión no aparece: a las ligas se llega con «Explorar ligas» desde la portada.
+  if (status === 'authenticated') links.push({ href: '/ligas', label: 'Ligas' });
   if (user?.role === 'ORGANIZER' || user?.role === 'ADMIN') links.push({ href: '/panel', label: 'Mis ligas' });
   if (user?.role === 'REFEREE') links.push({ href: '/panel/arbitro', label: 'Mis partidos' });
   if (user?.role === 'ADMIN') links.push({ href: '/admin', label: 'Administración' });

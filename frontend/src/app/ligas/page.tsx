@@ -1,6 +1,8 @@
 import { Search } from 'lucide-react';
 import type { Metadata } from 'next';
+import LigasPublicas from '@/components/LigasPublicas';
 import { LeagueCard } from '@/components/league/league-card';
+import { SessionGate } from '@/components/session-gate';
 import { EmptyState, Input, PageHeader, Pills } from '@/components/ui';
 import { qs } from '@/lib/api';
 import { safeGet } from '@/lib/server';
@@ -21,26 +23,29 @@ export default async function LeaguesPage({ searchParams }: { searchParams: Prom
   const selected = (SPORTS.find((s) => s.value === sport)?.value ?? 'ALL') as Sport | 'ALL';
   const leagues = await safeGet<League[]>(`/leagues${qs({ q, sport: selected === 'ALL' ? undefined : selected, limit: 60 })}`, []);
 
+  // Sin sesión, por ahora sin datos: LigasPublicas muestra «Aún no hay ligas publicadas».
   return (
-    <div>
-      <PageHeader title="Ligas" description="Ligas aprobadas por la federación. Consulta posiciones, calendario y resultados." />
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Pills options={SPORTS} value={selected} hrefFor={(value) => `/ligas${qs({ q, sport: value === 'ALL' ? undefined : value })}`} />
-        <form className="relative w-full sm:w-72" action="/ligas">
-          {selected !== 'ALL' && <input type="hidden" name="sport" value={selected} />}
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
-          <Input name="q" defaultValue={q} placeholder="Buscar por nombre o ciudad" className="pl-9" />
-        </form>
-      </div>
-      {leagues.length === 0 ? (
-        <EmptyState title="No encontramos ligas" description="Prueba con otra búsqueda o con otro deporte." />
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {leagues.map((league) => (
-            <LeagueCard key={league.id} league={league} />
-          ))}
+    <SessionGate anonymous={<LigasPublicas />}>
+      <div>
+        <PageHeader title="Ligas" description="Ligas aprobadas por la federación. Consulta posiciones, calendario y resultados." />
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Pills options={SPORTS} value={selected} hrefFor={(value) => `/ligas${qs({ q, sport: value === 'ALL' ? undefined : value })}`} />
+          <form className="relative w-full sm:w-72" action="/ligas">
+            {selected !== 'ALL' && <input type="hidden" name="sport" value={selected} />}
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
+            <Input name="q" defaultValue={q} placeholder="Buscar por nombre o ciudad" className="pl-9" />
+          </form>
         </div>
-      )}
-    </div>
+        {leagues.length === 0 ? (
+          <EmptyState title="No encontramos ligas" description="Prueba con otra búsqueda o con otro deporte." />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {leagues.map((league) => (
+              <LeagueCard key={league.id} league={league} />
+            ))}
+          </div>
+        )}
+      </div>
+    </SessionGate>
   );
 }
