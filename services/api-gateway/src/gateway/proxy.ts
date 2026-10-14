@@ -3,7 +3,7 @@ import type { ServerResponse } from 'node:http';
 import type { Socket } from 'node:net';
 import { createProxyMiddleware, type RequestHandler } from 'http-proxy-middleware';
 import { Counter, Histogram } from 'prom-client';
-import { log, registry } from '../chassis';
+import { envInt, log, registry } from '../chassis';
 import { resolveService, type ServiceName } from './routes';
 
 const gatewayRequests = new Counter({
@@ -27,6 +27,8 @@ function isServerResponse(res: ServerResponse | Socket): res is ServerResponse {
 /** Un proxy por microservicio; el despachador elige el destino según el path. */
 export function createProxyDispatcher(urls: Record<ServiceName, string>) {
   const proxies = new Map<ServiceName, RequestHandler<Request, Response>>();
+  // En Render Free conviene esperar más: un servicio dormido tarda ~1 minuto en despertar.
+  const timeout = envInt('PROXY_TIMEOUT_MS', 15_000);
   for (const [service, target] of Object.entries(urls) as [ServiceName, string][]) {
     proxies.set(
       service,
@@ -34,8 +36,8 @@ export function createProxyDispatcher(urls: Record<ServiceName, string>) {
         target,
         changeOrigin: true,
         xfwd: true,
-        proxyTimeout: 15_000,
-        timeout: 15_000,
+        proxyTimeout: timeout,
+        timeout,
         on: {
           error: (err, _req, res) => {
             log.error('proxy_error', { service, error: err.message });

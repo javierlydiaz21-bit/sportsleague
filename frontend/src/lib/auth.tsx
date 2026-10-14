@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ApiError, request } from './api';
+import { ApiError, SERVICE_WAKING_MESSAGE, isUnavailableStatus, request } from './api';
 import { PUBLIC_API_URL } from './config';
 import type { Role, User } from './types';
 
@@ -56,15 +56,20 @@ function writeCsrf(value: string | null): void {
 }
 
 async function authPost(path: string, body: unknown, csrf?: string | null): Promise<Response> {
-  return fetch(`${PUBLIC_API_URL}/api/v1/auth/${path}`, {
-    method: 'POST',
-    credentials: 'include', // la cookie httpOnly del refresh token viaja solo hacia /api/v1/auth
-    headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
-    body: JSON.stringify(body ?? {}),
-  });
+  try {
+    return await fetch(`${PUBLIC_API_URL}/api/v1/auth/${path}`, {
+      method: 'POST',
+      credentials: 'include', // la cookie httpOnly del refresh token viaja solo hacia /api/v1/auth
+      headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
+      body: JSON.stringify(body ?? {}),
+    });
+  } catch {
+    throw new ApiError(0, SERVICE_WAKING_MESSAGE);
+  }
 }
 
 async function readError(res: Response): Promise<ApiError> {
+  if (isUnavailableStatus(res.status)) return new ApiError(res.status, SERVICE_WAKING_MESSAGE);
   const data = await res.json().catch(() => ({}));
   const message = Array.isArray(data.message) ? data.message.join('. ') : (data.message ?? 'No se pudo completar la solicitud');
   return new ApiError(res.status, message, data.code, data);

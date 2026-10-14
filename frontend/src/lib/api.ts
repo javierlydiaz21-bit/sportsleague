@@ -1,5 +1,17 @@
-import { apiBase } from './config';
+import { PUBLIC_API_URL, apiBase } from './config';
 import { errorMessage } from './format';
+
+/** Mensaje cuando un servicio no responde (en Render Free, normalmente porque se está despertando). */
+export const SERVICE_WAKING_MESSAGE =
+  'El servidor no responde en este momento. Si la plataforma estuvo inactiva, tarda hasta un minuto en despertar: inténtalo de nuevo.';
+
+/** 502/503/504: el gateway o un servicio no respondió a tiempo. */
+export const isUnavailableStatus = (status: number) => status === 502 || status === 503 || status === 504;
+
+/** Avisa al gateway de que alguien usa la web: en Render Free despierta a los servicios dormidos. */
+export function wakeServices(): void {
+  void fetch(`${PUBLIC_API_URL}/health`, { mode: 'no-cors', cache: 'no-store' }).catch(() => undefined);
+}
 
 export class ApiError extends Error {
   constructor(
@@ -44,6 +56,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     data = text;
   }
   if (!res.ok) {
+    if (isUnavailableStatus(res.status)) throw new ApiError(res.status, SERVICE_WAKING_MESSAGE, undefined, data);
     const code = data && typeof data === 'object' && 'code' in data ? String((data as { code: unknown }).code) : undefined;
     throw new ApiError(res.status, errorMessage(data ?? { message: res.statusText }), code, data);
   }

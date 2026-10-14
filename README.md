@@ -411,10 +411,13 @@ Pasos:
 
 Límites del plan gratuito:
 
-- Cada servicio **se duerme tras 15 minutos sin tráfico** y tarda ~1 minuto en despertar. Antes de
-  una demostración entra como admin en *Administración → Sistema* y espera a que los 10 servicios
-  estén en verde (esa pantalla los consulta cada 10 s y los mantiene despiertos). Un servicio
-  dormido no recibe los eventos de Redis; si falta algo en la tabla, usa *Recalcular*.
+- Cada servicio **se duerme tras 15 minutos sin tráfico** y tarda ~1 minuto en despertar. Para que
+  eso no haga fallar la web, el gateway tiene un **despertador** (`WAKE_SERVICES=true` y
+  `PROXY_TIMEOUT_MS=60000` en `render-free.yaml`; en Docker Compose está desactivado): al abrir la
+  web se avisa al gateway, que despierta a la vez a los 9 servicios (y repite cada 4 minutos
+  mientras haya uso) y espera hasta 60 s a un servicio que se está despertando. Tras un rato sin
+  uso, la primera acción puede tardar ~40 s, pero no falla. Un servicio dormido no recibe los
+  eventos de Redis; si falta algo en la tabla, usa *Recalcular*.
 - 750 horas de instancia al mes para todo el workspace (10 servicios despiertos gastan 10 h por hora).
 - La PostgreSQL gratuita **caduca a los 30 días** y se borra 14 días después: crea el blueprint
   pocos días antes de la presentación.
