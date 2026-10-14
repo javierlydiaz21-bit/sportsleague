@@ -24,6 +24,9 @@ microservicios independientes. El README.md documenta todo; aquí van solo la es
   esos paquetes son del proyecto anterior (`sportsleague-ms`) y este repo no puede escribir en ellos.
   El usuario no paga servicios: el despliegue usa `render-free.yaml` (Render Free) y Vercel Hobby;
   `render.yaml` (de pago) queda como referencia. No propongas servicios de pago.
+  Producción: web https://sportsleague-cyan.vercel.app, gateway
+  https://sportsleague-jd-gateway.onrender.com, WebSocket https://sportsleague-jd-live.onrender.com.
+  La PostgreSQL gratuita (`sportsleague-jd-db`) se creó el 13/10/2026 y caduca a los 30 días.
 
 ## Arrancar y verificar
 

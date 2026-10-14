@@ -380,6 +380,9 @@ adapta así, con las mismas imágenes de GHCR:
 
 - Los 10 microservicios son servicios web públicos que se llaman entre sí por HTTPS; todos exigen
   el token interno (`x-internal-token`), así que sus rutas internas no se pueden usar desde fuera.
+- Solo puede haber **una** PostgreSQL y **un** Key Value gratuitos por workspace: si ya existen
+  otros (de otro proyecto), el blueprint falla con *cannot have more than one active free tier
+  database*; hay que borrarlos o usar otro workspace.
 - Una sola PostgreSQL con **una base por servicio**: la variable `DATABASE_NAME` elige la base de
   la misma instancia y Prisma la crea en el primer arranque (sin esa variable, como en Docker
   Compose, no cambia nada). Todas las bases comparten usuario y Analytics lee las de Fixture,
@@ -398,7 +401,11 @@ Pasos:
    URLs de `render-free.yaml` (`*_SERVICE_URL`, `CORS_ORIGINS`, `WS_ALLOWED_ORIGINS`) y haz push:
    Render sincroniza el blueprint. Si cambia la del gateway o la del WebSocket, actualiza también
    las variables de Vercel y vuelve a desplegar la web.
-4. Datos de demostración (desde cualquier equipo con Node 18+, en la carpeta del proyecto):
+4. Comprueba que el admin **no** entra con `Admin12345`. Si entra, `ADMIN_PASSWORD` no se aplicó
+   (pasa si el primer intento del blueprint falló y luego se usó *Manual Sync*): ponla en Render →
+   `sportsleague-jd-auth` → *Environment* y cambia la del admin ya creado con
+   `PATCH /api/v1/auth/me` (`{"currentPassword":"Admin12345","newPassword":"..."}`).
+5. Datos de demostración (desde cualquier equipo con Node 18+, en la carpeta del proyecto):
    - PowerShell: `$env:API_URL='https://sportsleague-jd-gateway.onrender.com'; $env:ADMIN_PASSWORD='<la del paso 1>'; node scripts/seed-demo.mjs`
    - Bash: `API_URL=https://sportsleague-jd-gateway.onrender.com ADMIN_PASSWORD='<la del paso 1>' node scripts/seed-demo.mjs`
 
