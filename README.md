@@ -93,6 +93,7 @@ construcción tardó ≈11 minutos y el arranque completo con la demo ≈15; los
 | La web abre pero no hay ligas | `docker compose --profile demo run --rm seed` |
 | El inicio de sesión falla al entrar por `http://127.0.0.1:3000` | Usa `http://localhost:3000`: es el origen permitido por CORS |
 | En Grafana, el panel *Rate limiting (429) y circuit breakers abiertos* dice *No data* | Es normal: solo muestra series cuando el gateway rechaza solicitudes o se abre un circuito |
+| No llegan correos | Sin `MAIL_RELAY_URL` quedan simulados (ver [Correo real con Gmail](#correo-real-con-gmail)). Las cuentas `@demo.com`, `@example.com` y `@sportsleague.com` nunca reciben correo. Si en *Administración* el envío aparece como `FAILED`, revisa que `MAIL_RELAY_SECRET` coincida con `SECRETO` del script y que el script esté implementado con acceso para «Cualquier usuario» |
 | Empezar de cero | `docker compose down -v` y luego `iniciar.bat` |
 
 ### Recorrido sugerido para la demostración
@@ -108,6 +109,21 @@ construcción tardó ≈11 minutos y el arranque completo con la demo ≈15; los
 7. Como **admin** revisa *Sistema* (los 10 servicios, canales de eventos, ETL), *Eventos*
    (bus de Redis en tiempo real) y *Trazabilidad* (todo el ciclo de vida de un partido).
 
+### App móvil (React Native)
+
+`mobile/` es la app de árbitros y espectadores del documento de arquitectura, hecha con Expo:
+el espectador sigue los partidos en vivo y los próximos sin iniciar sesión (marcador por WebSocket,
+canal `/live-scores`), y el árbitro ve y confirma sus partidos y registra goles, tarjetas y cambios.
+Por defecto usa la producción, así que basta con un teléfono con **Expo Go**:
+
+```bash
+cd mobile
+npm install
+npx expo start      # escanea el QR con Expo Go
+```
+
+Para usarla con la pila local, ver `mobile/README.md` (la IP del PC en lugar de `localhost`).
+
 ---
 
 ## Arquitectura
@@ -116,9 +132,12 @@ construcción tardó ≈11 minutos y el arranque completo con la demo ≈15; los
 flowchart LR
   subgraph Clientes
     WEB["Web Next.js<br/>(organizadores, árbitros,<br/>aficionados, admin)"]
+    APP["App React Native (Expo)<br/>(árbitros y espectadores)"]
   end
   WEB -- HTTP --> GW["API Gateway<br/>JWT · rate limiting · CORS · logs"]
+  APP -- HTTP --> GW
   WEB -. WebSocket .-> LIVE
+  APP -. WebSocket .-> LIVE
 
   GW --> AUTH[Auth]
   GW --> LEAGUE[League]
@@ -163,7 +182,7 @@ simula las réplicas de lectura del documento.
 | **Referee** | 4005 | Árbitros, disponibilidad, asignación automática | — | `referee.assigned`, `referee.unassigned` | `fixture.published`, `match.rescheduled`, `match.suspended`, `match.completed` |
 | **Live Score** | 4006 | Eventos en vivo (REST) y difusión por WebSocket, actas versionadas | Fixture, Referee, Team | `match.started`, `match.event`, `match.event.deleted`, `match.completed` | `match.suspended` (+ sus propios eventos para difundirlos) |
 | **Statistics** | 4007 | Tabla de posiciones, goleadores, disciplina (recálculo idempotente, caché Redis) | League, Live Score | `standings.updated` | `match.completed`, `fixture.published`, `rules.updated`, `match.event` |
-| **Notification** | 4008 | Bandeja de notificaciones, seguidores de ligas, envíos (correo/push simulados) | Team | — | `league.*`, `user.registered`, `fixture.published`, `referee.*`, `match.rescheduled`, `match.suspended`, `match.completed` |
+| **Notification** | 4008 | Bandeja de notificaciones, seguidores de ligas, correo real con Gmail (push simulado) | Team | — | `league.*`, `user.registered`, `fixture.published`, `referee.*`, `match.rescheduled`, `match.suspended`, `match.completed` |
 | **Analytics** | 4009 | ETL periódico: asistencia estimada, partidos suspendidos, tendencia de rendimiento, KPIs | — (réplicas de solo lectura) | — | — |
 
 ### Flujo completo de un partido
@@ -246,7 +265,7 @@ Para propagar una mejora: `node scripts/sync-chassis.mjs`.
 | Contraseñas | bcrypt (10 rondas), mínimo 8 caracteres con letras y números; tiempo constante ante correos inexistentes |
 | SQL injection | Prisma (consultas parametrizadas) + `ValidationPipe` con `whitelist` y `forbidNonWhitelisted` |
 | XSS | React escapa todo el contenido dinámico; cabeceras `X-Content-Type-Options`, `X-Frame-Options`, Helmet en el gateway |
-| CORS | El gateway rechaza orígenes no listados en `CORS_ORIGINS`; el WebSocket solo acepta `WS_ALLOWED_ORIGINS` |
+| CORS | El gateway rechaza orígenes no listados en `CORS_ORIGINS`; el WebSocket rechaza las webs que no están en `WS_ALLOWED_ORIGINS` (acepta la app móvil, que envía como origen el propio host del WebSocket) |
 | Validación | DTOs con class-validator en todos los servicios (fechas, rangos de edad, minutos 0–200, horarios HH:MM...) |
 
 ---
@@ -278,7 +297,9 @@ Para propagar una mejora: `node scripts/sync-chassis.mjs`.
 chassis/                 plantilla del microservice chassis (se copia a cada servicio)
 services/
   api-gateway/           cada servicio: src/, test/, prisma/ (schema + migraciones),
-  auth-service/          Dockerfile, package.json, .env.example, eslint y tsconfig propios
+  auth-service/          Dockerfile, package.json, .env.example, eslint y tsconfig propios,
+                         README.md, .gitignore, database/ (esquema, datos de ejemplo y respaldo)
+                         y .github/workflows/ci.yml para su repositorio independiente
   league-service/
   team-service/
   fixture-service/       src/fixtures/scheduler.ts → motor del calendario
@@ -288,6 +309,7 @@ services/
   notification-service/
   analytics-service/     src/etl/ → ETL sobre réplicas de solo lectura
 frontend/                Next.js 15 + TypeScript + Tailwind CSS 4
+mobile/                  app React Native (Expo) para árbitros y espectadores
 infra/                   PostgreSQL (una base por servicio), Prometheus, Grafana
 load-tests/              k6: varias jornadas en simultáneo contra Live Score
 scripts/                 seed-demo.mjs, sync-chassis.mjs
@@ -408,6 +430,8 @@ Pasos:
 5. Datos de demostración (desde cualquier equipo con Node 18+, en la carpeta del proyecto):
    - PowerShell: `$env:API_URL='https://sportsleague-jd-gateway.onrender.com'; $env:ADMIN_PASSWORD='<la del paso 1>'; node scripts/seed-demo.mjs`
    - Bash: `API_URL=https://sportsleague-jd-gateway.onrender.com ADMIN_PASSWORD='<la del paso 1>' node scripts/seed-demo.mjs`
+6. Correo real (opcional): pon `MAIL_RELAY_URL` y `MAIL_RELAY_SECRET` en Render →
+   `sportsleague-jd-notification` → *Environment* (ver [Correo real con Gmail](#correo-real-con-gmail)).
 
 Límites del plan gratuito:
 
@@ -423,6 +447,32 @@ Límites del plan gratuito:
   pocos días antes de la presentación.
 - En Safari, la sesión no sobrevive a una recarga de la página: bloquea la cookie de sesión
   (otro dominio, `onrender.com`) y hay que volver a iniciar sesión.
+- Render Free **bloquea los puertos SMTP** (25, 465 y 587) desde septiembre de 2025: por eso el
+  correo sale por HTTPS a través de Google Apps Script (sección siguiente).
+
+### Correo real con Gmail
+
+El Notification Service envía de verdad los correos (árbitro asignado, jornada publicada, cambios
+de horario, resultado final a quienes siguen la liga y la notificación de prueba) desde una cuenta
+de Gmail. Como Render Free no deja usar SMTP, el servicio hace un `POST` por HTTPS a un Google Apps
+Script publicado con esa cuenta, y el script envía el correo (unos 100 al día en cuentas gratuitas).
+
+1. https://script.google.com → *Nuevo proyecto* → pega
+   `services/notification-service/apps-script/enviar-correo.gs` y cambia `SECRETO` por una clave larga.
+2. *Implementar → Nueva implementación → Aplicación web*. Ejecutar como: *Yo*. Quién tiene acceso:
+   *Cualquier usuario*. Autoriza el acceso a Gmail (en el aviso de app no verificada: *Configuración
+   avanzada → Ir a…*).
+3. Copia la URL que termina en `/exec` y configura:
+   - **Local**: en `.env` (copia de `.env.example`) `MAIL_RELAY_URL=<url>` y
+     `MAIL_RELAY_SECRET=<clave>`; después `docker compose up -d notification-service`.
+   - **Render**: las mismas variables en `sportsleague-jd-notification` → *Environment*.
+4. Prueba: inicia sesión con una cuenta que tenga un correo real y llama a
+   `POST /api/v1/notifications/test`; la respuesta trae `emailStatus` (`SENT`, `FAILED` o
+   `SIMULATED`) y *Administración* muestra cada envío.
+
+Sin `MAIL_RELAY_URL` todo sigue funcionando con los envíos simulados. Las cuentas de demostración
+(`MAIL_SKIP_DOMAINS`, por defecto `demo.com,example.com,sportsleague.com`) nunca reciben correo,
+para no gastar la cuota en direcciones inventadas.
 
 ---
 
@@ -438,7 +488,21 @@ Límites del plan gratuito:
   documento); `matches` solo guarda referencias por id y la web compone nombres consultando a Team.
 - **Árbitros enlazados por correo**: el organizador registra al árbitro con su correo; si esa
   persona crea una cuenta de árbitro con el mismo correo, ve y opera sus partidos.
-- **Envíos de correo/push simulados**: el Notification Service registra cada envío (visible
-  para el admin) en lugar de usar un proveedor externo.
+- **Correo real por HTTPS, push simulado**: el correo sale desde Gmail mediante Google Apps
+  Script (Render Free bloquea SMTP); el push queda registrado como simulado. Cada envío es visible
+  para el admin con su estado.
+- **Rutas del documento con nombres alternativos**: la web usa `POST /leagues/{id}/categories`,
+  `GET /seasons/{id}/fixtures` y el canal WebSocket `/live`; también existen las rutas tal como
+  las escribe el documento: `POST /seasons/{id}/categories` (crea la categoría en la liga de la
+  temporada), `GET /fixtures/{seasonId}` (acepta el id de un calendario o de una temporada) y el
+  canal `/live-scores`.
+- **Una sola PostgreSQL en Render Free**: el plan gratuito solo permite una instancia, así que cada
+  servicio tiene su propia **base** dentro de ella (`DATABASE_NAME`); en Docker Compose cada
+  servicio tiene además su propio usuario. `render.yaml` (de pago) usa una instancia por servicio.
+- **Sin entorno de staging en la nube**: el plan gratuito no admite una segunda base de datos. La
+  rama `develop` publica imágenes con la etiqueta `develop`, que se prueban en local con Docker
+  Compose, y Vercel crea un *preview* por Pull Request para la web.
 - **Réplicas de lectura en local**: se simulan con el usuario de solo lectura `analytics_ro`;
-  en Render se usan réplicas reales (`*_REPLICA_URL`).
+  con planes de pago (`render.yaml`) se apuntan réplicas reales (`*_REPLICA_URL`). En Render Free
+  no hay réplicas ni usuarios por servicio: Analytics lee por su nombre las bases de Fixture, Live
+  Score y Statistics de la misma instancia, siempre en transacciones de solo lectura.
