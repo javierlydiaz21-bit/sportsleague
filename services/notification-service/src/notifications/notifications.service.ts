@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { Counter } from 'prom-client';
 import { EventBus, ServiceClient, env, log, registry, traceMatch, type AuthUser, type EventEnvelope } from '../chassis';
 import { PrismaService } from '../prisma/prisma.service';
+import { Mailer } from './mailer';
 import {
   finalResult,
   leagueCreated,
@@ -24,8 +25,8 @@ const notificationsCreated = new Counter({
 });
 const deliveriesTotal = new Counter({
   name: 'notification_deliveries_total',
-  help: 'Envíos por canal externo (simulados)',
-  labelNames: ['channel'] as const,
+  help: 'Envíos por canal externo y resultado (SENT, FAILED o SIMULATED)',
+  labelNames: ['channel', 'status'] as const,
   registers: [registry],
 });
 
@@ -40,10 +41,12 @@ type AnyEvent = EventEnvelope<any>;
 @Injectable()
 export class NotificationsService implements OnModuleInit {
   private readonly teams = new ServiceClient('team-service', env('TEAM_SERVICE_URL', 'http://localhost:4003'), { timeoutMs: 2000 });
+  private readonly webUrl = env('WEB_URL', 'http://localhost:3000');
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly bus: EventBus,
+    private readonly mailer: Mailer,
   ) {}
 
   onModuleInit(): void {
@@ -74,16 +77,27 @@ export class NotificationsService implements OnModuleInit {
     await this.toLeagueAudience(event, message);
   }
 
-  /** Organizador de la liga + aficionados que la siguen. */
+  /** Organizador de la liga + aficionados que la siguen (correo solo a quienes no lo desactivaron). */
   async toLeagueAudience(event: AnyEvent, message: Message): Promise<void> {
     const subscriptions = await this.prisma.subscription.findMany({ where: { leagueId: event.data.leagueId } });
     const userIds = new Set<string>([event.data.ownerId, ...subscriptions.map((s) => s.userId)].filter(Boolean));
+    const noEmail = await this.optedOut(subscriptions.map((s) => s.userId), 'email');
     await this.notify(
       event,
       [...userIds].map((userId) => ({ userId })),
       message,
-      subscriptions.map((s) => s.email),
+      subscriptions.filter((s) => !noEmail.has(s.userId)).map((s) => s.email),
     );
+  }
+
+  /** Usuarios que desactivaron un canal en sus preferencias. */
+  private async optedOut(userIds: string[], channel: 'email' | 'push'): Promise<Set<string>> {
+    if (userIds.length === 0) return new Set();
+    const rows = await this.prisma.preference.findMany({
+      where: { userId: { in: userIds }, ...(channel === 'email' ? { emailEnabled: false } : { pushEnabled: false }) },
+      select: { userId: true },
+    });
+    return new Set(rows.map((row) => row.userId));
   }
 
   /** Crea las notificaciones (idempotente gracias a dedupeKey) y registra los envíos externos. */
@@ -105,25 +119,28 @@ export class NotificationsService implements OnModuleInit {
     if (created.count === 0) return 0; // evento repetido: ya se notificó
     notificationsCreated.inc({ type: message.type }, created.count);
 
+    const emailRecipients = [...new Set(emails.filter(Boolean).map((e) => e.toLowerCase()))];
+    const emailStatuses = await Promise.all(emailRecipients.map((to) => this.mailer.send(to, message.title, this.mailBody(message))));
+    const pushUsers = rows.filter((row) => row.userId).map((row) => row.userId as string);
+    const noPush = await this.optedOut(pushUsers, 'push');
     const deliveries = [
-      ...[...new Set(emails.filter(Boolean).map((e) => e.toLowerCase()))].map((recipient) => ({
-        channel: 'EMAIL',
-        recipient,
-        subject: message.title,
-        status: 'SIMULATED',
-      })),
-      ...rows
-        .filter((row) => row.userId)
-        .map((row) => ({ channel: 'PUSH', recipient: row.userId as string, subject: message.title, status: 'SIMULATED' })),
+      ...emailRecipients.map((recipient, i) => ({ channel: 'EMAIL', recipient, subject: message.title, status: emailStatuses[i] })),
+      ...pushUsers
+        .filter((userId) => !noPush.has(userId))
+        .map((userId) => ({ channel: 'PUSH', recipient: userId, subject: message.title, status: 'SIMULATED' })),
     ];
     if (deliveries.length) {
       await this.prisma.delivery.createMany({ data: deliveries });
-      for (const delivery of deliveries) deliveriesTotal.inc({ channel: delivery.channel });
+      for (const delivery of deliveries) deliveriesTotal.inc({ channel: delivery.channel, status: delivery.status });
     }
     const matchId = typeof event.data?.matchId === 'string' ? event.data.matchId : undefined;
     if (matchId) traceMatch(matchId, 'notifications_sent', { type: message.type, recipients: created.count });
     else log.info('notifications_sent', { type: message.type, recipients: created.count, eventType: event.type });
     return created.count;
+  }
+
+  private mailBody(message: Message): string {
+    return message.link ? `${message.body}\n\nVer en SportsLeague: ${this.webUrl}${message.link}` : message.body;
   }
 
   // ---------- API ----------
@@ -185,8 +202,14 @@ export class NotificationsService implements OnModuleInit {
         dedupeKey: `test-${user.id}-${Date.now()}`,
       },
     });
-    await this.prisma.delivery.create({ data: { channel: 'PUSH', recipient: user.id, subject: created.title, status: 'SIMULATED' } });
-    return created;
+    const emailStatus = await this.mailer.send(user.email, created.title, created.body);
+    await this.prisma.delivery.createMany({
+      data: [
+        { channel: 'PUSH', recipient: user.id, subject: created.title, status: 'SIMULATED' },
+        { channel: 'EMAIL', recipient: user.email.toLowerCase(), subject: created.title, status: emailStatus },
+      ],
+    });
+    return { ...created, emailStatus };
   }
 
   deliveries(limit = 100) {

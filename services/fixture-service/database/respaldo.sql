@@ -1,0 +1,247 @@
+--
+-- PostgreSQL database dump
+--
+
+\restrict VA5NAG8Noksj9ZbfrFtmBjwEDfaQKBh6SmWihNs4bytIuwmrKUvaC7gc7lpzmhU
+
+-- Dumped from database version 16.15
+-- Dumped by pg_dump version 16.15
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+ALTER TABLE IF EXISTS ONLY public.matches DROP CONSTRAINT IF EXISTS matches_fixture_id_fkey;
+DROP INDEX IF EXISTS public.matches_status_idx;
+DROP INDEX IF EXISTS public.matches_season_id_scheduled_at_idx;
+DROP INDEX IF EXISTS public.matches_league_id_idx;
+DROP INDEX IF EXISTS public.matches_category_id_idx;
+DROP INDEX IF EXISTS public.fixtures_season_id_category_id_key;
+ALTER TABLE IF EXISTS ONLY public.matches DROP CONSTRAINT IF EXISTS matches_pkey;
+ALTER TABLE IF EXISTS ONLY public.fixtures DROP CONSTRAINT IF EXISTS fixtures_pkey;
+ALTER TABLE IF EXISTS ONLY public._prisma_migrations DROP CONSTRAINT IF EXISTS _prisma_migrations_pkey;
+DROP TABLE IF EXISTS public.matches;
+DROP TABLE IF EXISTS public.fixtures;
+DROP TABLE IF EXISTS public._prisma_migrations;
+DROP TYPE IF EXISTS public."MatchStatus";
+DROP TYPE IF EXISTS public."FixtureStatus";
+--
+-- Name: FixtureStatus; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public."FixtureStatus" AS ENUM (
+    'DRAFT',
+    'PUBLISHED'
+);
+
+
+--
+-- Name: MatchStatus; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public."MatchStatus" AS ENUM (
+    'SCHEDULED',
+    'LIVE',
+    'FINISHED',
+    'SUSPENDED'
+);
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: _prisma_migrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public._prisma_migrations (
+    id character varying(36) NOT NULL,
+    checksum character varying(64) NOT NULL,
+    finished_at timestamp with time zone,
+    migration_name character varying(255) NOT NULL,
+    logs text,
+    rolled_back_at timestamp with time zone,
+    started_at timestamp with time zone DEFAULT now() NOT NULL,
+    applied_steps_count integer DEFAULT 0 NOT NULL
+);
+
+
+--
+-- Name: fixtures; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.fixtures (
+    id uuid NOT NULL,
+    season_id uuid NOT NULL,
+    category_id uuid NOT NULL,
+    league_id uuid NOT NULL,
+    owner_id uuid NOT NULL,
+    status public."FixtureStatus" DEFAULT 'DRAFT'::public."FixtureStatus" NOT NULL,
+    double_round boolean DEFAULT false NOT NULL,
+    total_rounds integer DEFAULT 0 NOT NULL,
+    config jsonb NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    published_at timestamp(3) without time zone
+);
+
+
+--
+-- Name: matches; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.matches (
+    id uuid NOT NULL,
+    fixture_id uuid NOT NULL,
+    season_id uuid NOT NULL,
+    category_id uuid NOT NULL,
+    league_id uuid NOT NULL,
+    owner_id uuid NOT NULL,
+    round integer NOT NULL,
+    home_team_id uuid NOT NULL,
+    away_team_id uuid NOT NULL,
+    venue_id uuid,
+    scheduled_at timestamp(3) without time zone NOT NULL,
+    status public."MatchStatus" DEFAULT 'SCHEDULED'::public."MatchStatus" NOT NULL,
+    suspension_reason text,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Data for Name: _prisma_migrations; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public._prisma_migrations (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) FROM stdin;
+3c968498-2dda-4c06-bb21-5df23bb8d02a	43b8b274e87af6d10221cb13bb776e77ca1fb39bacc8c7e65a8f65ca7ccfd292	2026-10-17 15:57:49.795598+00	20261011000000_init	\N	\N	2026-10-17 15:57:49.520074+00	1
+\.
+
+
+--
+-- Data for Name: fixtures; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.fixtures (id, season_id, category_id, league_id, owner_id, status, double_round, total_rounds, config, created_at, published_at) FROM stdin;
+453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	PUBLISHED	t	10	{"matchDays": [0], "startDate": "2026-08-30", "doubleRound": true, "minRestDays": 3, "slotMinutes": 120}	2026-10-17 15:58:05.508	2026-10-17 15:58:05.57
+\.
+
+
+--
+-- Data for Name: matches; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.matches (id, fixture_id, season_id, category_id, league_id, owner_id, round, home_team_id, away_team_id, venue_id, scheduled_at, status, suspension_reason, created_at, updated_at) FROM stdin;
+7de1b4d8-60b7-4305-bd48-d829131011ec	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	8	4bde52dc-874c-4828-a3e8-eb1f6a7585b6	b9547f9d-bcf3-416d-be8e-49747b939a79	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-10-18 21:00:00	SCHEDULED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:05.508
+e21b7998-cece-4d17-bea2-4a6065e62679	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	9	b8ff9a76-bd82-424a-90d3-4cecfbf65b5f	ab0337ae-4666-4966-8dcf-6ee5550f3e22	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-10-25 13:00:00	SCHEDULED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:05.508
+7f9f5a5f-6800-4ba4-ba6c-74a7b99ecfe3	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	9	7d428867-6b12-452d-861e-a519d70dedd0	b9547f9d-bcf3-416d-be8e-49747b939a79	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-10-25 19:00:00	SCHEDULED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:05.508
+88fa8f81-ea34-4686-b1e3-32d80a310fbb	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	9	32c34014-0bd9-4102-ad3a-5f84bc59a5a5	4bde52dc-874c-4828-a3e8-eb1f6a7585b6	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-10-25 15:00:00	SCHEDULED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:05.508
+16d20ed7-ad4c-4a43-8bdd-0ef6fd41cbd9	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	10	b9547f9d-bcf3-416d-be8e-49747b939a79	b8ff9a76-bd82-424a-90d3-4cecfbf65b5f	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-11-01 19:00:00	SCHEDULED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:05.508
+3268d545-1a59-452e-b82c-453fa086b693	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	10	ab0337ae-4666-4966-8dcf-6ee5550f3e22	4bde52dc-874c-4828-a3e8-eb1f6a7585b6	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-11-01 13:00:00	SCHEDULED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:05.508
+7ad11e0e-d054-436e-b7ee-1b5b6a372600	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	10	7d428867-6b12-452d-861e-a519d70dedd0	32c34014-0bd9-4102-ad3a-5f84bc59a5a5	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-11-01 21:00:00	SCHEDULED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:05.508
+5a68f769-52fd-43d5-a5f6-db37fe8cb545	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	1	b8ff9a76-bd82-424a-90d3-4cecfbf65b5f	4bde52dc-874c-4828-a3e8-eb1f6a7585b6	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-08-30 13:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:10.031
+68f2e9ed-483c-41e8-8dbb-50a0b76d7082	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	1	32c34014-0bd9-4102-ad3a-5f84bc59a5a5	b9547f9d-bcf3-416d-be8e-49747b939a79	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-08-30 19:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:10.382
+4f6fb652-5483-48de-9f65-fab75b5a1abc	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	1	7d428867-6b12-452d-861e-a519d70dedd0	ab0337ae-4666-4966-8dcf-6ee5550f3e22	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-08-30 21:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:10.641
+0d759168-6570-4058-9717-ae3c3ec90e42	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	2	32c34014-0bd9-4102-ad3a-5f84bc59a5a5	b8ff9a76-bd82-424a-90d3-4cecfbf65b5f	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-09-06 13:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:10.949
+a39c5742-4fdf-4c2a-894a-c5258fdaebc3	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	2	ab0337ae-4666-4966-8dcf-6ee5550f3e22	b9547f9d-bcf3-416d-be8e-49747b939a79	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-09-06 15:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:11.278
+7f6961be-530a-4365-8f72-70c525432a9c	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	2	7d428867-6b12-452d-861e-a519d70dedd0	4bde52dc-874c-4828-a3e8-eb1f6a7585b6	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-09-06 19:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:11.575
+946b0e8d-5750-40d9-82c9-28963daa90c1	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	3	b8ff9a76-bd82-424a-90d3-4cecfbf65b5f	7d428867-6b12-452d-861e-a519d70dedd0	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-09-13 13:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:11.903
+58dd0ad4-afde-46cf-b2dd-b658a64cea8a	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	3	b9547f9d-bcf3-416d-be8e-49747b939a79	4bde52dc-874c-4828-a3e8-eb1f6a7585b6	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-09-13 15:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:12.096
+aa369254-a42b-4b36-a4cd-fd3624dca403	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	3	ab0337ae-4666-4966-8dcf-6ee5550f3e22	32c34014-0bd9-4102-ad3a-5f84bc59a5a5	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-09-13 19:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:12.329
+4e5ba4a4-455a-45d1-aadb-ae47d00660be	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	4	b9547f9d-bcf3-416d-be8e-49747b939a79	7d428867-6b12-452d-861e-a519d70dedd0	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-09-20 13:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:12.497
+17d59921-c355-40cb-95b6-afd38c212124	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	4	ab0337ae-4666-4966-8dcf-6ee5550f3e22	b8ff9a76-bd82-424a-90d3-4cecfbf65b5f	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-09-20 19:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:12.69
+85e59089-be9a-4c45-9600-85a287009a56	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	4	4bde52dc-874c-4828-a3e8-eb1f6a7585b6	32c34014-0bd9-4102-ad3a-5f84bc59a5a5	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-09-20 21:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:12.887
+164d663d-0e19-447b-9ac7-66262a7cdc5a	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	5	b8ff9a76-bd82-424a-90d3-4cecfbf65b5f	b9547f9d-bcf3-416d-be8e-49747b939a79	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-09-27 13:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:13.298
+5949d616-faf0-4dc8-a3d0-22f773454225	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	5	32c34014-0bd9-4102-ad3a-5f84bc59a5a5	7d428867-6b12-452d-861e-a519d70dedd0	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-09-27 15:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:13.5
+dcae3a01-e4b1-4b24-a590-52c23e701038	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	5	4bde52dc-874c-4828-a3e8-eb1f6a7585b6	ab0337ae-4666-4966-8dcf-6ee5550f3e22	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-09-27 19:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:13.792
+9a8499dd-8f31-4e13-80f8-a835ff60c70f	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	6	b9547f9d-bcf3-416d-be8e-49747b939a79	32c34014-0bd9-4102-ad3a-5f84bc59a5a5	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-10-04 13:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:14.195
+c5cbce55-1e3b-4300-b1b5-1255903f5a20	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	6	4bde52dc-874c-4828-a3e8-eb1f6a7585b6	b8ff9a76-bd82-424a-90d3-4cecfbf65b5f	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-10-04 19:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:14.538
+904e9388-81db-443f-87f6-3e3a39ea27f9	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	6	ab0337ae-4666-4966-8dcf-6ee5550f3e22	7d428867-6b12-452d-861e-a519d70dedd0	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-10-04 21:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:14.896
+f3caf4be-b9a0-4011-bd67-60aa8d81bcd5	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	7	b8ff9a76-bd82-424a-90d3-4cecfbf65b5f	32c34014-0bd9-4102-ad3a-5f84bc59a5a5	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-10-11 13:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:15.229
+ff95bca3-f823-4026-8c6f-3c94990de590	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	7	b9547f9d-bcf3-416d-be8e-49747b939a79	ab0337ae-4666-4966-8dcf-6ee5550f3e22	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-10-11 15:00:00	FINISHED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:15.499
+69a81d41-8ee9-4cfb-9e1b-ad9658e7d583	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	7	4bde52dc-874c-4828-a3e8-eb1f6a7585b6	7d428867-6b12-452d-861e-a519d70dedd0	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-10-11 19:00:00	LIVE	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:15.554
+c3ca84b4-19ca-4088-a77a-e592fcd477bd	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	8	32c34014-0bd9-4102-ad3a-5f84bc59a5a5	ab0337ae-4666-4966-8dcf-6ee5550f3e22	2c8a9776-a71a-4b29-a20b-eda40aeece3e	2026-10-18 13:00:00	SUSPENDED	Cancha en mantenimiento por lluvias	2026-10-17 15:58:05.508	2026-10-17 15:58:15.654
+1d50a151-b0a5-47e7-a300-8f4e9a079ec9	453aee08-ac60-4151-bcfd-5348b6a8f811	e05bb80b-7ebf-4d20-bb7a-3933d9cb36cf	719a94f9-95a7-43d3-ba07-2f907d87c038	e1465a8b-d5b1-418e-abc1-9f5efba20c74	ab7d9b35-97b6-4e00-b17e-ab915cd51696	8	7d428867-6b12-452d-861e-a519d70dedd0	b8ff9a76-bd82-424a-90d3-4cecfbf65b5f	c0898445-bca0-43f8-ad8f-960eacbd8e33	2026-10-18 19:00:00	SCHEDULED	\N	2026-10-17 15:58:05.508	2026-10-17 15:58:15.709
+\.
+
+
+--
+-- Name: _prisma_migrations _prisma_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public._prisma_migrations
+    ADD CONSTRAINT _prisma_migrations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: fixtures fixtures_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.fixtures
+    ADD CONSTRAINT fixtures_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: matches matches_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.matches
+    ADD CONSTRAINT matches_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: fixtures_season_id_category_id_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX fixtures_season_id_category_id_key ON public.fixtures USING btree (season_id, category_id);
+
+
+--
+-- Name: matches_category_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX matches_category_id_idx ON public.matches USING btree (category_id);
+
+
+--
+-- Name: matches_league_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX matches_league_id_idx ON public.matches USING btree (league_id);
+
+
+--
+-- Name: matches_season_id_scheduled_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX matches_season_id_scheduled_at_idx ON public.matches USING btree (season_id, scheduled_at);
+
+
+--
+-- Name: matches_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX matches_status_idx ON public.matches USING btree (status);
+
+
+--
+-- Name: matches matches_fixture_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.matches
+    ADD CONSTRAINT matches_fixture_id_fkey FOREIGN KEY (fixture_id) REFERENCES public.fixtures(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict VA5NAG8Noksj9ZbfrFtmBjwEDfaQKBh6SmWihNs4bytIuwmrKUvaC7gc7lpzmhU
+

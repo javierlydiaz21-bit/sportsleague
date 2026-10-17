@@ -207,6 +207,12 @@ export class LeaguesService {
     });
   }
 
+  async addCategoryToSeason(seasonId: string, dto: CreateCategoryDto, user: AuthUser) {
+    const season = await this.prisma.season.findUnique({ where: { id: seasonId }, select: { leagueId: true } });
+    if (!season) throw new NotFoundException('Temporada no encontrada');
+    return this.addCategory(season.leagueId, dto, user);
+  }
+
   async getCategory(id: string, user?: AuthUser) {
     const category = await this.prisma.category.findUnique({
       where: { id },
