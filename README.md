@@ -392,7 +392,39 @@ npm run start:dev
 - `render.yaml`: blueprint de referencia con los 10 servicios (gateway y Live Score públicos, el
   resto privados), 9 bases de datos y Redis (Key Value). Requiere planes de pago de Render.
 - `render-free.yaml`: variante **gratuita** para demostraciones (ver la sección siguiente).
-- Flujo Git: `feature/*` → `develop` → `main`, `hotfix/*` desde `main`; PR con revisión y checks en verde.
+- Flujo Git: `feature/*` → `develop` → `main`, `hotfix/*` desde `main`; PR con revisión y checks en
+  verde. `main` está protegida: solo cambia por Pull Request (también para los administradores) y
+  sin *force push*. No exige checks concretos porque cada workflow solo corre si cambia su carpeta.
+
+### Un repositorio por microservicio
+
+Además de este repositorio principal (donde se trabaja), cada servicio está publicado con su
+historial como repositorio independiente, con su README, `.env.example`, `database/` y CI propio
+(lint, Jest, build e imagen Docker en cada push y Pull Request a `main` y `develop`):
+
+| Servicio | Repositorio |
+|---|---|
+| API Gateway | https://github.com/javierlydiaz21-bit/sportsleague-api-gateway |
+| Auth | https://github.com/javierlydiaz21-bit/sportsleague-auth-service |
+| League | https://github.com/javierlydiaz21-bit/sportsleague-league-service |
+| Team | https://github.com/javierlydiaz21-bit/sportsleague-team-service |
+| Fixture | https://github.com/javierlydiaz21-bit/sportsleague-fixture-service |
+| Referee | https://github.com/javierlydiaz21-bit/sportsleague-referee-service |
+| Live Score | https://github.com/javierlydiaz21-bit/sportsleague-live-score-service |
+| Statistics | https://github.com/javierlydiaz21-bit/sportsleague-statistics-service |
+| Notification | https://github.com/javierlydiaz21-bit/sportsleague-notification-service |
+| Analytics | https://github.com/javierlydiaz21-bit/sportsleague-analytics-service |
+
+En cada uno, `main` exige Pull Request con los checks *Lint, pruebas y build* e *Imagen Docker* en
+verde. Para llevar a un repositorio los cambios hechos aquí:
+
+```bash
+git subtree split --prefix=services/fixture-service -b split/fixture-service
+git push https://github.com/javierlydiaz21-bit/sportsleague-fixture-service.git split/fixture-service:develop
+# y en GitHub: Pull Request develop → main en sportsleague-fixture-service
+```
+
+Las imágenes que usa Render las sigue publicando este repositorio (`sportsleague-app-<servicio>`).
 
 ### Despliegue gratuito (Render Free + Vercel Hobby)
 
