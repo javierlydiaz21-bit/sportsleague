@@ -50,4 +50,20 @@ describe('Live Score Service (HTTP + WebSocket)', () => {
     await bus.publish('match.event', { matchId, type: 'GOAL', score: { home: 1, away: 0 }, registeredAt: new Date().toISOString() });
     await expect(received).resolves.toMatchObject({ matchId, type: 'GOAL', score: { home: 1, away: 0 } });
   });
+
+  it('el canal /live-scores del documento de arquitectura difunde los mismos eventos', async () => {
+    const { port } = app.getHttpServer().address() as AddressInfo;
+    const alias = io(`http://127.0.0.1:${port}/live-scores`, { transports: ['websocket'] });
+    try {
+      await new Promise((resolve) => {
+        alias.on('match:snapshot', resolve);
+        alias.on('connect', () => alias.emit('subscribe', { matchId }));
+      });
+      const received = new Promise<any>((resolve) => alias.on('match:event', resolve));
+      await bus.publish('match.event', { matchId, type: 'YELLOW_CARD', score: { home: 1, away: 0 } });
+      await expect(received).resolves.toMatchObject({ matchId, type: 'YELLOW_CARD' });
+    } finally {
+      alias.disconnect();
+    }
+  });
 });

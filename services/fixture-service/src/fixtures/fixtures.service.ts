@@ -313,12 +313,15 @@ export class FixturesService implements OnModuleInit {
     return fixtures.filter((f) => f.status === 'PUBLISHED' || isOwnerOrAdmin(user, f.ownerId));
   }
 
+  /** GET /fixtures/{id}: id de un calendario o, como en el documento de arquitectura, id de una temporada. */
   async getFixture(id: string, user?: AuthUser) {
     const fixture = await this.prisma.fixture.findUnique({ where: { id }, include: { matches: { orderBy: MATCH_ORDER } } });
-    if (!fixture || (fixture.status !== 'PUBLISHED' && !isOwnerOrAdmin(user, fixture.ownerId))) {
-      throw new NotFoundException('Calendario no encontrado');
+    if (fixture && (fixture.status === 'PUBLISHED' || isOwnerOrAdmin(user, fixture.ownerId))) return fixture;
+    if (!fixture) {
+      const seasonFixtures = await this.seasonFixtures(id, undefined, user);
+      if (seasonFixtures.length) return seasonFixtures;
     }
-    return fixture;
+    throw new NotFoundException('Calendario no encontrado');
   }
 
   listMatches(query: ListMatchesQuery) {
