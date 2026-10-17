@@ -1,0 +1,64 @@
+# CI del repositorio independiente de auth-service: se ejecuta en cada push a main/develop y en cada
+# Pull Request. La imagen que se despliega en Render la publica el repositorio principal
+# (github.com/javierlydiaz21-bit/sportsleague) en ghcr.io/javierlydiaz21-bit/sportsleague-app-auth-service.
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, pruebas y build
+    runs-on: ubuntu-latest
+    env:
+      INTERNAL_API_TOKEN: ci-internal-token
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias (npm ci)
+        run: npm ci --no-audit --no-fund
+
+      - name: Generar cliente Prisma
+        run: npx prisma generate
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Pruebas unitarias e integración (Jest)
+        run: npm test -- --ci --coverage
+
+      - name: Compilar
+        run: npm run build
+
+  image:
+    name: Imagen Docker
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Construir la imagen (sin publicar)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: sportsleague-auth-service:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
