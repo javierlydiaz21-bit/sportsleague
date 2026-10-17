@@ -1,4 +1,5 @@
 import { InMemoryEventBus, buildEnvelope } from '../chassis';
+import { Mailer } from './mailer';
 import { NotificationsService } from './notifications.service';
 
 process.env.LOG_LEVEL = 'error';
@@ -16,9 +17,11 @@ function setup() {
     },
     delivery: { createMany: jest.fn(async ({ data }) => deliveries.push(...data)) },
     subscription: { findMany: jest.fn(async () => [{ userId: 'fan-1', email: 'fan@liga.com' }]) },
+    preference: { findMany: jest.fn(async (): Promise<{ userId: string }[]> => []) },
   };
-  const service = new NotificationsService(prisma, new InMemoryEventBus());
-  return { service, notifications, deliveries };
+  const mailer = { send: jest.fn(async () => 'SENT') } as unknown as Mailer;
+  const service = new NotificationsService(prisma, new InMemoryEventBus(), mailer);
+  return { service, notifications, deliveries, mailer, prisma };
 }
 
 describe('NotificationsService', () => {
@@ -44,5 +47,23 @@ describe('NotificationsService', () => {
     await service.toLeagueAudience(event, { type: 'FIXTURE_PUBLISHED', title: 'Jornada 1', body: 'b' });
     expect(notifications.map((n) => n.userId).sort()).toEqual(['fan-1', 'owner-1']);
     expect(deliveries.map((d) => d.channel).sort()).toEqual(['EMAIL', 'PUSH', 'PUSH']);
+  });
+
+  it('envía el correo de los aficionados con el enlace completo y guarda el resultado', async () => {
+    const { service, deliveries, mailer } = setup();
+    const event = buildEnvelope('match.completed', { leagueId: 'L1', ownerId: 'owner-1', matchId: 'M1' });
+    await service.toLeagueAudience(event, { type: 'MATCH_RESULT', title: 'Final', body: 'Leones 2 - 1 Tigres', link: '/partidos/M1' });
+    expect(mailer.send).toHaveBeenCalledWith('fan@liga.com', 'Final', expect.stringContaining('http://localhost:3000/partidos/M1'));
+    expect(deliveries.find((d) => d.channel === 'EMAIL')).toMatchObject({ recipient: 'fan@liga.com', status: 'SENT' });
+  });
+
+  it('respeta las preferencias: sin correo ni push para quien los desactivó', async () => {
+    const { service, notifications, deliveries, mailer, prisma } = setup();
+    prisma.preference.findMany.mockResolvedValue([{ userId: 'fan-1' }]);
+    const event = buildEnvelope('fixture.published', { leagueId: 'L1', ownerId: 'owner-1' });
+    await service.toLeagueAudience(event, { type: 'FIXTURE_PUBLISHED', title: 'Jornada 1', body: 'b' });
+    expect(notifications.map((n) => n.userId).sort()).toEqual(['fan-1', 'owner-1']); // la bandeja no depende de las preferencias
+    expect(mailer.send).not.toHaveBeenCalled();
+    expect(deliveries).toEqual([expect.objectContaining({ channel: 'PUSH', recipient: 'owner-1' })]);
   });
 });

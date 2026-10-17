@@ -259,6 +259,13 @@ services:
         fromService: { type: keyvalue, name: sportsleague-jd-redis, property: connectionString }
       - key: TEAM_SERVICE_URL
         value: https://sportsleague-jd-team.onrender.com
+      # Correo real con Gmail por HTTPS (Render Free bloquea SMTP): se introducen en el panel.
+      - key: MAIL_RELAY_URL
+        sync: false
+      - key: MAIL_RELAY_SECRET
+        sync: false
+      - key: WEB_URL
+        value: https://sportsleague-cyan.vercel.app
 
   - type: web
     name: sportsleague-jd-analytics

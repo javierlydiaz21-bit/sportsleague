@@ -7,8 +7,17 @@ microservicios independientes. El README.md documenta todo; aquí van solo la es
 
 - `services/`: 10 microservicios NestJS 11 + Prisma 6, cada uno con Dockerfile y base PostgreSQL propia.
   - api-gateway 4000, auth 4001, league 4002, team 4003, fixture 4004, referee 4005,
-    live-score 4006 (Socket.IO, namespace `/live`), statistics 4007, notification 4008, analytics 4009.
+    live-score 4006 (Socket.IO, namespace `/live` y su alias `/live-scores`), statistics 4007,
+    notification 4008, analytics 4009.
   - Al arrancar: `npx prisma migrate deploy && node dist/main.js`. Healthcheck: `GET /health`.
+  - Cada carpeta lleva README.md, `.gitignore`, `database/` (esquema, datos de ejemplo y respaldo,
+    generados con pg_dump desde una demo limpia) y `.github/workflows/ci.yml`: se publica también
+    como repositorio independiente `github.com/javierlydiaz21-bit/sportsleague-<servicio>` con
+    `git subtree split`. Se edita siempre aquí, en el repositorio principal.
+  - Correo real: Notification envía por HTTPS a un Google Apps Script (`MAIL_RELAY_URL`,
+    `MAIL_RELAY_SECRET`) porque Render Free bloquea SMTP. Sin esas variables, simulado.
+  - El documento de arquitectura del equipo (`SPORTSLEAGUE-ARQUITECTURA.pdf`, no está en el repo)
+    es la referencia de requisitos; las diferencias están en «Decisiones respecto al documento» del README.
 - `chassis/`: código común. Se COPIA a `services/*/src/chassis` con `node scripts/sync-chassis.mjs`.
   Edita siempre `chassis/` y sincroniza; nunca edites solo una copia.
 - `frontend/`: Next.js 15 (output standalone) + Tailwind 4, puerto 3000. Las `NEXT_PUBLIC_*` se
@@ -16,6 +25,10 @@ microservicios independientes. El README.md documenta todo; aquí van solo la es
   - Sin sesión, `/` y `/ligas` muestran `components/LandingSimulator.tsx` y `components/LigasPublicas.tsx`
     (componentes del usuario; `LigasPublicas` va sin datos por decisión suya). `SessionGate` elige la
     vista con `useAuth()`; con sesión se ven las páginas de siempre. `SimuladorLigas.tsx` se conserva sin uso.
+- `mobile/`: app Expo (React Native, SDK 58) para árbitros y espectadores; apunta a producción por
+  defecto (`EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_WS_URL`). Se prueba con Expo Go; `node_modules` solo
+  en una carpeta temporal. React Native envía como `Origin` el host del WebSocket: el Live Score
+  Service lo acepta (`io.adapter.ts`).
 - `infra/postgres/init/01-databases.sh`: 9 bases, un usuario por servicio y `analytics_ro` (solo
   lectura). Solo corre con el volumen `pgdata` nuevo: si lo cambias, `docker compose down -v`.
 - `infra/prometheus`, `infra/grafana`: observabilidad (Prometheus 9090, Grafana 3100 admin/admin).

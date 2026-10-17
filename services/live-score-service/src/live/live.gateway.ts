@@ -35,8 +35,6 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, On
   @WebSocketServer()
   server: Namespace;
 
-  private subscriptions = 0;
-
   constructor(
     private readonly live: LiveService,
     private readonly viewers: ViewersService,
@@ -71,8 +69,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       if (joined.size >= MAX_SUBSCRIPTIONS_PER_SOCKET) return { ok: false, error: 'Demasiadas suscripciones' };
       joined.add(matchId);
       await client.join(room(matchId));
-      this.subscriptions += 1;
-      liveSubscriptions.set(this.subscriptions);
+      liveSubscriptions.inc();
       const count = await this.viewers.join(matchId);
       this.server.to(room(matchId)).emit('viewers', { matchId, count });
     }
@@ -90,8 +87,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     const joined = client.data.matches as Set<string> | undefined;
     if (!joined?.delete(matchId)) return;
     await client.leave(room(matchId));
-    this.subscriptions = Math.max(0, this.subscriptions - 1);
-    liveSubscriptions.set(this.subscriptions);
+    liveSubscriptions.dec();
     const count = await this.viewers.leave(matchId);
     this.server?.to(room(matchId)).emit('viewers', { matchId, count });
   }
@@ -112,3 +108,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     }
   }
 }
+
+/** El mismo canal con el nombre del documento de arquitectura (WS /live-scores). */
+@WebSocketGateway({ namespace: '/live-scores' })
+export class LiveScoresGateway extends LiveGateway {}

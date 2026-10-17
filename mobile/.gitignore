@@ -1,0 +1,35 @@
+# Dependencias
+node_modules/
+
+# Expo (caché, tipos generados y exports)
+.expo/
+dist/
+dist-*/
+web-build/
+expo-env.d.ts
+
+# Carpetas nativas generadas (Continuous Native Generation)
+/ios
+/android
+.kotlin/
+
+# Claves de firma
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# Metro y depuración
+.metro-health-check*
+npm-debug.*
+*.orig.*
+
+# Variables de entorno locales
+.env*.local
+
+# TypeScript
+*.tsbuildinfo
+
+.DS_Store

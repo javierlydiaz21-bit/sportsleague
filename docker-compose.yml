@@ -143,6 +143,10 @@ services:
       PORT: 4008
       DATABASE_URL: postgresql://notification_user:${SERVICES_DB_PASSWORD:-sl_dev_pass}@postgres:5432/notification_db
       TEAM_SERVICE_URL: http://team-service:4003
+      # Correo real con Gmail (ver README): sin estas variables los correos quedan simulados.
+      MAIL_RELAY_URL: ${MAIL_RELAY_URL:-}
+      MAIL_RELAY_SECRET: ${MAIL_RELAY_SECRET:-}
+      WEB_URL: http://localhost:3000
 
   analytics-service:
     <<: *service
