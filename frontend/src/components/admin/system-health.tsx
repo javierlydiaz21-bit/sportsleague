@@ -18,6 +18,12 @@ interface Delivery {
   createdAt: string;
 }
 
+const DELIVERY_STATUS: Record<string, { label: string; tone: 'green' | 'red' | 'neutral' }> = {
+  SENT: { label: 'Enviado', tone: 'green' },
+  FAILED: { label: 'Falló', tone: 'red' },
+  SIMULATED: { label: 'Simulado', tone: 'neutral' },
+};
+
 const GRAFANA_URL = process.env.NEXT_PUBLIC_GRAFANA_URL ?? 'http://localhost:3100';
 const PROMETHEUS_URL = process.env.NEXT_PUBLIC_PROMETHEUS_URL ?? 'http://localhost:9090';
 
@@ -170,11 +176,15 @@ export function SystemHealthView() {
       </section>
 
       <section>
-        <SectionTitle title="Envíos de notificaciones" description="Correo y push (simulados en este entorno) registrados por el Notification Service." />
+        <SectionTitle
+          title="Envíos de notificaciones"
+          description="Correo (real con Gmail si MAIL_RELAY_URL está configurada) y push (simulado) registrados por el Notification Service."
+        />
         <Table>
           <thead>
             <tr>
               <Th>Canal</Th>
+              <Th>Estado</Th>
               <Th>Destinatario</Th>
               <Th>Asunto</Th>
               <Th>Cuándo</Th>
@@ -185,6 +195,9 @@ export function SystemHealthView() {
               <tr key={delivery.id}>
                 <Td>
                   <Badge tone={delivery.channel === 'EMAIL' ? 'blue' : 'neutral'}>{delivery.channel === 'EMAIL' ? 'Correo' : 'Push'}</Badge>
+                </Td>
+                <Td>
+                  <Badge tone={DELIVERY_STATUS[delivery.status]?.tone ?? 'neutral'}>{DELIVERY_STATUS[delivery.status]?.label ?? delivery.status}</Badge>
                 </Td>
                 <Td className="max-w-56 truncate text-xs text-muted">{delivery.recipient}</Td>
                 <Td className="text-sm">{delivery.subject}</Td>
