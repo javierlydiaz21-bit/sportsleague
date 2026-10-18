@@ -218,6 +218,39 @@ En el gateway, `PATCH /api/v1/leagues/:id/review` y `GET /api/v1/leagues/stats` 
 restringidas a `ADMIN`. Las rutas `/api/v1/seasons/:id/fixtures/*` no llegan a este servicio: el gateway
 las envía al Fixture Service.
 
+### Ejemplo: de la liga a la categoría por el API Gateway
+
+Recorrido con la pila local (`docker compose up -d`) y la cuenta `organizador@demo.com`. Cada
+respuesta devuelve el `id` que usa la petición siguiente.
+
+```bash
+API=http://localhost:4000/api/v1
+
+# 1. Iniciar sesión ("client":"mobile" devuelve el token en el cuerpo de la respuesta)
+curl -s -X POST $API/auth/login -H 'content-type: application/json' \
+  -d '{"email":"organizador@demo.com","password":"Demo12345","client":"mobile"}'
+TOKEN=<accessToken de la respuesta>
+
+# 2. Crear la liga: nace en estado PENDING hasta que el administrador la apruebe
+curl -s -X POST $API/leagues -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"name":"Liga Universitaria","sport":"FOOTBALL","city":"Montería"}'
+
+# 3. Temporada (la fecha de inicio debe ser anterior a la de fin)
+curl -s -X POST $API/leagues/<id de la liga>/seasons -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"name":"Apertura 2026","year":2026,"startDate":"2026-11-01","endDate":"2026-12-15"}'
+
+# 4. Categoría con rango de edad, creada desde la temporada (ruta del documento de arquitectura)
+curl -s -X POST $API/seasons/<id de la temporada>/categories -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d '{"name":"Sub-20","minAge":16,"maxAge":20}'
+
+# 5. Reglamento por defecto del fútbol (público): 3 puntos por victoria, 1 por empate, 0 por derrota
+curl -s $API/categories/<id de la categoría>/rules
+```
+
+Errores habituales: `400` si los datos no son válidos (por ejemplo, «La edad mínima no puede ser
+mayor que la edad máxima»), `401` sin token y `403` si la liga pertenece a otro organizador.
+
 ## Eventos
 
 Se publican en **Redis Pub/Sub**: el canal es el nombre del evento y el mensaje es un sobre JSON
