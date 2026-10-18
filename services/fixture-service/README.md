@@ -219,9 +219,9 @@ este servicio.
 
 ### Ejemplo: generar, publicar y reprogramar el calendario
 
-Requisitos: la liga debe estar *aprobada* por el administrador, y la categoría debe tener al
+Requisitos: la liga debe estar **aprobada** por el administrador, y la categoría debe tener al
 menos 2 equipos y canchas con días y horario disponibles. Con la pila local y la cuenta
-organizador@demo.com (el TOKEN se obtiene con POST /auth/login):
+`organizador@demo.com` (el `TOKEN` se obtiene con `POST /auth/login`):
 
 ```bash
 API=http://localhost:4000/api/v1
@@ -234,8 +234,20 @@ curl -s -X POST $API/seasons/<id de la temporada>/fixtures/generate -H "authoriz
 
 # 2. Publicar: emite fixture.published por cada jornada; Referee asigna los árbitros
 #    automáticamente y Notification avisa a los seguidores de la liga
-curl -s -X POST $API/fixtures/<id del calendario>/publish
+curl -s -X POST $API/fixtures/<id del calendario>/publish -H "authorization: Bearer $TOKEN"
+
+# 3. Consultar (público): calendarios de la temporada y partidos programados
+curl -s $API/fixtures/<id de la temporada>
+curl -s "$API/matches?seasonId=<id de la temporada>&status=SCHEDULED"
+
+# 4. Reprogramar un partido (cambio de cancha u horario): emite match.rescheduled
+curl -s -X PUT $API/matches/<id del partido>/venue -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"venueId":"<id de la cancha>","scheduledAt":"2026-11-08T15:00:00-05:00"}'
 ```
+
+Errores habituales: `400` si la categoría tiene menos de 2 equipos, `403` si la liga es de otro
+organizador, y `409` si la liga aún no está aprobada o la categoría ya tiene un calendario publicado.
 
 ## Eventos
 
