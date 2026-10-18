@@ -266,6 +266,13 @@ services:
         sync: false
       - key: WEB_URL
         value: https://sportsleague-cyan.vercel.app
+      # Push real en el navegador (Web Push): claves VAPID, se introducen en el panel.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:admin@sportsleague.com
 
   - type: web
     name: sportsleague-jd-analytics

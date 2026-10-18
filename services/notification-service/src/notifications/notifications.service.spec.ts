@@ -1,6 +1,7 @@
 import { InMemoryEventBus, buildEnvelope } from '../chassis';
 import { Mailer } from './mailer';
 import { NotificationsService } from './notifications.service';
+import type { WebPusher } from './push';
 
 process.env.LOG_LEVEL = 'error';
 
@@ -20,8 +21,9 @@ function setup() {
     preference: { findMany: jest.fn(async (): Promise<{ userId: string }[]> => []) },
   };
   const mailer = { send: jest.fn(async () => 'SENT') } as unknown as Mailer;
-  const service = new NotificationsService(prisma, new InMemoryEventBus(), mailer);
-  return { service, notifications, deliveries, mailer, prisma };
+  const pusher = { sendToUser: jest.fn(async () => 'SENT') } as unknown as WebPusher;
+  const service = new NotificationsService(prisma, new InMemoryEventBus(), mailer, pusher);
+  return { service, notifications, deliveries, mailer, pusher, prisma };
 }
 
 describe('NotificationsService', () => {
@@ -55,6 +57,16 @@ describe('NotificationsService', () => {
     await service.toLeagueAudience(event, { type: 'MATCH_RESULT', title: 'Final', body: 'Leones 2 - 1 Tigres', link: '/partidos/M1' });
     expect(mailer.send).toHaveBeenCalledWith('fan@liga.com', 'Final', expect.stringContaining('http://localhost:3000/partidos/M1'));
     expect(deliveries.find((d) => d.channel === 'EMAIL')).toMatchObject({ recipient: 'fan@liga.com', status: 'SENT' });
+  });
+
+  it('envía el push real a cada destinatario y guarda su resultado', async () => {
+    const { service, deliveries, pusher } = setup();
+    const event = buildEnvelope('match.completed', { leagueId: 'L1', ownerId: 'owner-1', matchId: 'M1' });
+    const message = { type: 'MATCH_RESULT', title: 'Final', body: 'Leones 2 - 1 Tigres', link: '/partidos/M1' };
+    await service.toLeagueAudience(event, message);
+    expect(pusher.sendToUser).toHaveBeenCalledWith('owner-1', message);
+    expect(pusher.sendToUser).toHaveBeenCalledWith('fan-1', message);
+    expect(deliveries.filter((d) => d.channel === 'PUSH').map((d) => d.status)).toEqual(['SENT', 'SENT']);
   });
 
   it('respeta las preferencias: sin correo ni push para quien los desactivó', async () => {

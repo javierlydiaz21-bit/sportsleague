@@ -8,6 +8,7 @@ import { useAsync } from '@/lib/hooks';
 import type { Notification } from '@/lib/types';
 import { RequireAuth } from '../require-auth';
 import { Button, Card, EmptyState, PageHeader, PageSpinner, cn } from '../ui';
+import { PushToggle } from './push-toggle';
 
 function Inbox() {
   const { api } = useAuth();
@@ -35,6 +36,7 @@ function Inbox() {
           ) : null
         }
       />
+      <PushToggle />
       {!data || data.items.length === 0 ? (
         <EmptyState icon={<Bell className="h-5 w-5" />} title="Sin notificaciones" description="Aquí verás aprobaciones, jornadas publicadas, asignaciones y resultados." />
       ) : (
