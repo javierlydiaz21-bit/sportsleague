@@ -93,6 +93,7 @@ construcción tardó ≈11 minutos y el arranque completo con la demo ≈15; los
 | La web abre pero no hay ligas | `docker compose --profile demo run --rm seed` |
 | El inicio de sesión falla al entrar por `http://127.0.0.1:3000` | Usa `http://localhost:3000`: es el origen permitido por CORS |
 | En Grafana, el panel *Rate limiting (429) y circuit breakers abiertos* dice *No data* | Es normal: solo muestra series cuando el gateway rechaza solicitudes o se abre un circuito |
+| No llegan las notificaciones push | Comprueba que el navegador tenga permiso (candado de la barra de direcciones → Notificaciones → Permitir), que el sistema operativo no las silencie (modo *No molestar*) y que el servicio tenga `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY`. Si se cambiaron las claves, pulsa *Desactivar* y luego *Activar* |
 | No llegan correos | Sin `MAIL_RELAY_URL` quedan simulados (ver [Correo real con Gmail](#correo-real-con-gmail)). Las cuentas `@demo.com`, `@example.com` y `@sportsleague.com` nunca reciben correo. Si en *Administración* el envío aparece como `FAILED`, revisa que `MAIL_RELAY_SECRET` coincida con `SECRETO` del script y que el script esté implementado con acceso para «Cualquier usuario» |
 | Empezar de cero | `docker compose down -v` y luego `iniciar.bat` |
 
@@ -182,7 +183,7 @@ simula las réplicas de lectura del documento.
 | **Referee** | 4005 | Árbitros, disponibilidad, asignación automática | — | `referee.assigned`, `referee.unassigned` | `fixture.published`, `match.rescheduled`, `match.suspended`, `match.completed` |
 | **Live Score** | 4006 | Eventos en vivo (REST) y difusión por WebSocket, actas versionadas | Fixture, Referee, Team | `match.started`, `match.event`, `match.event.deleted`, `match.completed` | `match.suspended` (+ sus propios eventos para difundirlos) |
 | **Statistics** | 4007 | Tabla de posiciones, goleadores, disciplina (recálculo idempotente, caché Redis) | League, Live Score | `standings.updated` | `match.completed`, `fixture.published`, `rules.updated`, `match.event` |
-| **Notification** | 4008 | Bandeja de notificaciones, seguidores de ligas, correo real con Gmail (push simulado) | Team | — | `league.*`, `user.registered`, `fixture.published`, `referee.*`, `match.rescheduled`, `match.suspended`, `match.completed` |
+| **Notification** | 4008 | Bandeja de notificaciones, seguidores de ligas, correo real con Gmail y push real en el navegador (Web Push) | Team | — | `league.*`, `user.registered`, `fixture.published`, `referee.*`, `match.rescheduled`, `match.suspended`, `match.completed` |
 | **Analytics** | 4009 | ETL periódico: asistencia estimada, partidos suspendidos, tendencia de rendimiento, KPIs | — (réplicas de solo lectura) | — | — |
 
 ### Flujo completo de un partido
@@ -462,8 +463,9 @@ Pasos:
 5. Datos de demostración (desde cualquier equipo con Node 18+, en la carpeta del proyecto):
    - PowerShell: `$env:API_URL='https://sportsleague-jd-gateway.onrender.com'; $env:ADMIN_PASSWORD='<la del paso 1>'; node scripts/seed-demo.mjs`
    - Bash: `API_URL=https://sportsleague-jd-gateway.onrender.com ADMIN_PASSWORD='<la del paso 1>' node scripts/seed-demo.mjs`
-6. Correo real (opcional): pon `MAIL_RELAY_URL` y `MAIL_RELAY_SECRET` en Render →
-   `sportsleague-jd-notification` → *Environment* (ver [Correo real con Gmail](#correo-real-con-gmail)).
+6. Correo y push reales (opcional): pon `MAIL_RELAY_URL`, `MAIL_RELAY_SECRET`, `VAPID_PUBLIC_KEY` y
+   `VAPID_PRIVATE_KEY` en Render → `sportsleague-jd-notification` → *Environment* (ver
+   [Correo real con Gmail](#correo-real-con-gmail) y [Notificaciones push](#notificaciones-push-en-el-navegador)).
 
 Límites del plan gratuito:
 
@@ -506,6 +508,24 @@ Sin `MAIL_RELAY_URL` todo sigue funcionando con los envíos simulados. Las cuent
 (`MAIL_SKIP_DOMAINS`, por defecto `demo.com,example.com,sportsleague.com`) nunca reciben correo,
 para no gastar la cuota en direcciones inventadas.
 
+### Notificaciones push en el navegador
+
+Cada usuario puede activar en *Notificaciones → Notificaciones en este navegador → Activar* los
+avisos push: le llegan como notificación del sistema aunque tenga la web cerrada (Chrome, Edge y
+Firefox, en el computador y en Android; en iPhone no está disponible). Se usa **Web Push**, el
+estándar de los navegadores: el service worker `frontend/public/sw.js` recibe el aviso y el
+Notification Service lo envía cifrado con un par de claves **VAPID**, sin proveedor de pago.
+
+1. Genera el par de claves una vez: `npx web-push generate-vapid-keys` (en cualquier carpeta temporal).
+2. Configúralas:
+   - **Local**: en `.env`, `VAPID_PUBLIC_KEY=...` y `VAPID_PRIVATE_KEY=...`; después
+     `docker compose up -d notification-service`.
+   - **Render**: las mismas variables en `sportsleague-jd-notification` → *Environment*.
+3. Prueba: en *Notificaciones* pulsa *Activar*, acepta el permiso del navegador y luego *Enviar prueba*.
+
+La clave privada es secreta: nunca la subas al repositorio. Si cambias el par de claves, cada usuario
+debe volver a pulsar *Activar*. Sin claves, el push queda como `SIMULATED`.
+
 ---
 
 ## Decisiones respecto al documento de arquitectura
@@ -520,9 +540,9 @@ para no gastar la cuota en direcciones inventadas.
   documento); `matches` solo guarda referencias por id y la web compone nombres consultando a Team.
 - **Árbitros enlazados por correo**: el organizador registra al árbitro con su correo; si esa
   persona crea una cuenta de árbitro con el mismo correo, ve y opera sus partidos.
-- **Correo real por HTTPS, push simulado**: el correo sale desde Gmail mediante Google Apps
-  Script (Render Free bloquea SMTP); el push queda registrado como simulado. Cada envío es visible
-  para el admin con su estado.
+- **Correo y push reales sin proveedores de pago**: el correo sale desde Gmail mediante Google Apps
+  Script (Render Free bloquea SMTP) y el push usa Web Push, el estándar de los navegadores. Cada
+  envío es visible para el admin con su estado.
 - **Rutas del documento con nombres alternativos**: la web usa `POST /leagues/{id}/categories`,
   `GET /seasons/{id}/fixtures` y el canal WebSocket `/live`; también existen las rutas tal como
   las escribe el documento: `POST /seasons/{id}/categories` (crea la categoría en la liga de la

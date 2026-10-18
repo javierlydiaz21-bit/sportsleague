@@ -53,8 +53,8 @@ model Preference {
   @@map("preferences")
 }
 
-/// Registro de envíos por canal externo (correo / push). El correo es real si MAIL_RELAY_URL está configurada
-/// (status SENT o FAILED); el push y el correo sin configurar quedan como SIMULATED.
+/// Registro de envíos por canal externo (correo / push): SENT o FAILED cuando se intentó el envío real;
+/// SIMULATED si el canal no está configurado (MAIL_RELAY_URL, claves VAPID) o el usuario no tiene navegadores suscritos.
 model Delivery {
   id        String   @id @default(uuid()) @db.Uuid
   channel   String
@@ -65,4 +65,18 @@ model Delivery {
 
   @@index([createdAt])
   @@map("deliveries")
+}
+
+/// Navegador suscrito a Web Push: el endpoint del servicio push del navegador y sus claves de cifrado.
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }

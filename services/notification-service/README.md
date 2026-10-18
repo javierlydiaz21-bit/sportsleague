@@ -3,7 +3,8 @@
 Microservicio de notificaciones de **SportsLeague**, la plataforma de gestión de ligas deportivas amateur
 (fútbol, básquet y vóley). Escucha los eventos de la plataforma y genera avisos en la bandeja de cada
 usuario (administradores, organizadores, árbitros y aficionados que siguen una liga), envía correos
-reales desde Gmail a través de un Google Apps Script y registra cada envío. El push es simulado.
+reales desde Gmail a través de un Google Apps Script, notificaciones push reales al navegador (Web Push) y
+registra cada envío.
 
 | Puerto | Base de datos | Repositorio del servicio | Sistema completo |
 |---|---|---|---|
@@ -28,7 +29,12 @@ reales desde Gmail a través de un Google Apps Script y registra cada envío. El
   notificación de prueba.
 - **Simulación**: sin `MAIL_RELAY_URL`, o si el destinatario es de un dominio de `MAIL_SKIP_DOMAINS` (por
   defecto `demo.com`, `example.com` y `sportsleague.com`), el correo queda como `SIMULATED`; si el script
-  rechaza la clave o no responde en 15 s, queda como `FAILED`. El **push siempre es simulado**.
+  rechaza la clave o no responde en 15 s, queda como `FAILED`.
+- **Push real en el navegador** con Web Push, el estándar de los navegadores (sin proveedor de pago): el
+  usuario pulsa *Activar* en *Notificaciones*, el navegador se suscribe (`push_subscriptions`) y cada aviso
+  se envía cifrado con las claves VAPID a todos sus navegadores, aunque tenga la web cerrada. Las
+  suscripciones caducadas (404/410) se borran solas. Sin `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, o si el
+  usuario no tiene navegadores suscritos, el push queda como `SIMULATED`.
 - **Registro de envíos** por canal (`EMAIL`, `PUSH`) y resultado (`SENT`, `FAILED`, `SIMULATED`),
   visible para el administrador.
 - **Preferencias** de canal por usuario (`emailEnabled`, `pushEnabled`): quien desactiva el correo deja de
@@ -216,7 +222,10 @@ entre paréntesis, la comprobación adicional del servicio. *Rol* = solo esos ro
 | GET | `/api/v1/notifications/unread-count` | Sesión | `{ unread }`. |
 | GET | `/api/v1/notifications/preferences` | Sesión | Preferencias de canal del usuario. |
 | PUT | `/api/v1/notifications/preferences` | Sesión | Guarda `emailEnabled` y `pushEnabled`. |
-| POST | `/api/v1/notifications/test` | Sesión | Crea una notificación de prueba y envía un correo al usuario. Devuelve la notificación con `emailStatus`. |
+| POST | `/api/v1/notifications/test` | Sesión | Crea una notificación de prueba y la envía por correo y por push al usuario. Devuelve la notificación con `emailStatus` y `pushStatus`. |
+| GET | `/api/v1/notifications/push/public-key` | Público | `{ publicKey }`: clave pública VAPID para suscribirse (`null` si el push no está configurado). |
+| POST | `/api/v1/notifications/push/subscriptions` | Sesión | Guarda la suscripción del navegador (`{ endpoint, keys: { p256dh, auth } }`). |
+| DELETE | `/api/v1/notifications/push/subscriptions?endpoint=` | Sesión | Borra la suscripción de ese navegador. |
 | POST | `/api/v1/notifications/read-all` | Sesión | Marca todas como leídas; devuelve `{ updated }`. |
 | GET | `/api/v1/notifications/deliveries` | Rol `ADMIN` | Últimos envíos por canal y resultado (`limit` hasta 200). |
 | GET | `/api/v1/notifications/:userId` | Sesión (el propio usuario o `ADMIN`) | Bandeja de un usuario (ruta del documento de arquitectura). |
@@ -260,6 +269,7 @@ Se consumen de **Redis Pub/Sub**: el canal es el nombre del evento y el mensaje 
 |---|---|---|---|---|
 | Team Service | `GET /api/v1/teams?ids=` | Nombres de los equipos para los avisos de suspensión y de resultado. Si falla, el aviso sale igual con «Local» y «Visitante». | 2000 ms | 2 |
 | Google Apps Script (externo) | `POST` a `MAIL_RELAY_URL` con `{ secret, to, subject, body }` | Enviar el correo desde Gmail. El cuerpo incluye el enlace «Ver en SportsLeague» con `WEB_URL`. | 15 s | 0 |
+| Servicio push del navegador (externo: FCM, Mozilla, Windows…) | `POST` cifrado al `endpoint` de cada suscripción (librería `web-push`) | Entregar la notificación push `{ title, body, link }`. | 10 s | 0 |
 
 La llamada al Team Service usa el `ServiceClient` del chassis: reintentos con backoff exponencial (150 ms,
 300 ms… con variación aleatoria; solo en lecturas) y circuit breaker (se abre tras 5 fallos seguidos,
@@ -278,8 +288,9 @@ Ningún otro servicio puede conectarse a ella.
 | `subscriptions` | `id` (UUID, PK), `user_id`, `email`, `league_id`, `created_at` | Único `subscriptions_user_id_league_id_key` (`user_id`, `league_id`); índice `subscriptions_league_id_idx` |
 | `preferences` | `user_id` (PK), `email_enabled`, `push_enabled`, `updated_at` | — |
 | `deliveries` | `id` (UUID, PK), `channel` (`EMAIL` o `PUSH`), `recipient`, `subject`, `status` (`SENT`, `FAILED` o `SIMULATED`), `created_at` | Índice `deliveries_created_at_idx` |
+| `push_subscriptions` | `id` (UUID, PK), `user_id`, `endpoint`, `p256dh`, `auth`, `user_agent`, `created_at` | Único `push_subscriptions_endpoint_key`; índice `push_subscriptions_user_id_idx` |
 
-Las migraciones están en `prisma/migrations/` (`20261011000000_init`) y se aplican solas al arrancar con
+Las migraciones están en `prisma/migrations/` (`20261011000000_init` y `20261018000000_push_subscriptions`) y se aplican solas al arrancar con
 `npx prisma migrate deploy`; Prisma registra las aplicadas en la tabla `_prisma_migrations`.
 
 ### Carpeta `database/`
@@ -320,6 +331,9 @@ del archivo.
 | `MAIL_RELAY_SECRET` | No (sí si hay `MAIL_RELAY_URL`) | vacía | Clave compartida; debe coincidir con `SECRETO` del script. |
 | `MAIL_SKIP_DOMAINS` | No | `demo.com,example.com,sportsleague.com` | Dominios que nunca reciben correo real (cuentas de demostración), separados por comas. |
 | `WEB_URL` | No | `http://localhost:3000` | URL de la web para el enlace «Ver en SportsLeague» de los correos. Render: `https://sportsleague-cyan.vercel.app`. |
+| `VAPID_PUBLIC_KEY` | No | vacía | Clave pública VAPID para Web Push (`npx web-push generate-vapid-keys`). Vacía = push simulado. |
+| `VAPID_PRIVATE_KEY` | No (sí si hay `VAPID_PUBLIC_KEY`) | vacía | Clave privada VAPID del mismo par. Es secreta: solo en las variables de entorno. |
+| `VAPID_SUBJECT` | No | `mailto:admin@sportsleague.com` | Contacto que se envía a los servicios push (formato `mailto:` o `https:`). |
 | `LEAGUE_TIMEZONE` | No | `America/Bogota` | Zona horaria con la que las plantillas muestran la fecha y hora de los partidos. |
 | `LOG_LEVEL` | No | `info` | Nivel mínimo de log: `debug`, `info`, `warn` o `error`. |
 | `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express (de qué proxies se acepta `X-Forwarded-For`). |

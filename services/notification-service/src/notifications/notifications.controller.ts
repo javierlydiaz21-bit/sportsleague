@@ -1,8 +1,9 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Headers, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, IsUrl, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { CurrentUser, Public, Roles, isAdmin, type AuthUser } from '../chassis';
 import { NotificationsService } from './notifications.service';
+import { WebPusher } from './push';
 
 class LimitQuery {
   @IsOptional()
@@ -28,9 +29,41 @@ class SubscribeDto {
   leagueId: string;
 }
 
+const PUSH_ENDPOINT = { protocols: ['https'], require_protocol: true };
+
+class PushKeysDto {
+  @IsString()
+  @MaxLength(200)
+  p256dh: string;
+
+  @IsString()
+  @MaxLength(100)
+  auth: string;
+}
+
+/** Suscripción que devuelve PushManager.subscribe() en el navegador (endpoint + claves). */
+class PushSubscriptionDto {
+  @IsUrl(PUSH_ENDPOINT)
+  @MaxLength(1000)
+  endpoint: string;
+
+  @ValidateNested()
+  @Type(() => PushKeysDto)
+  keys: PushKeysDto;
+}
+
+class PushEndpointQuery {
+  @IsUrl(PUSH_ENDPOINT)
+  @MaxLength(1000)
+  endpoint: string;
+}
+
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private readonly notifications: NotificationsService) {}
+  constructor(
+    private readonly notifications: NotificationsService,
+    private readonly pusher: WebPusher,
+  ) {}
 
   @Get()
   inbox(@CurrentUser() user: AuthUser, @Query() query: LimitQuery) {
@@ -55,6 +88,23 @@ export class NotificationsController {
   @Post('test')
   test(@CurrentUser() user: AuthUser) {
     return this.notifications.test(user);
+  }
+
+  /** Clave pública VAPID con la que el navegador se suscribe; null si el push real no está configurado. */
+  @Public()
+  @Get('push/public-key')
+  pushPublicKey() {
+    return { publicKey: this.pusher.enabled ? this.pusher.publicKey : null };
+  }
+
+  @Post('push/subscriptions')
+  subscribePush(@CurrentUser() user: AuthUser, @Body() dto: PushSubscriptionDto, @Headers('user-agent') userAgent?: string) {
+    return this.pusher.subscribe(user.id, dto, userAgent);
+  }
+
+  @Delete('push/subscriptions')
+  unsubscribePush(@CurrentUser() user: AuthUser, @Query() query: PushEndpointQuery) {
+    return this.pusher.unsubscribe(user.id, query.endpoint);
   }
 
   @Post('read-all')
