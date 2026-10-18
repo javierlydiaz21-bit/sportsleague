@@ -4,6 +4,7 @@ import { Counter } from 'prom-client';
 import { EventBus, ServiceClient, env, log, registry, traceMatch, type AuthUser, type EventEnvelope } from '../chassis';
 import { PrismaService } from '../prisma/prisma.service';
 import { Mailer } from './mailer';
+import { WebPusher } from './push';
 import {
   finalResult,
   leagueCreated,
@@ -47,6 +48,7 @@ export class NotificationsService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly bus: EventBus,
     private readonly mailer: Mailer,
+    private readonly pusher: WebPusher,
   ) {}
 
   onModuleInit(): void {
@@ -123,11 +125,11 @@ export class NotificationsService implements OnModuleInit {
     const emailStatuses = await Promise.all(emailRecipients.map((to) => this.mailer.send(to, message.title, this.mailBody(message))));
     const pushUsers = rows.filter((row) => row.userId).map((row) => row.userId as string);
     const noPush = await this.optedOut(pushUsers, 'push');
+    const pushRecipients = pushUsers.filter((userId) => !noPush.has(userId));
+    const pushStatuses = await Promise.all(pushRecipients.map((userId) => this.pusher.sendToUser(userId, message)));
     const deliveries = [
       ...emailRecipients.map((recipient, i) => ({ channel: 'EMAIL', recipient, subject: message.title, status: emailStatuses[i] })),
-      ...pushUsers
-        .filter((userId) => !noPush.has(userId))
-        .map((userId) => ({ channel: 'PUSH', recipient: userId, subject: message.title, status: 'SIMULATED' })),
+      ...pushRecipients.map((userId, i) => ({ channel: 'PUSH', recipient: userId, subject: message.title, status: pushStatuses[i] })),
     ];
     if (deliveries.length) {
       await this.prisma.delivery.createMany({ data: deliveries });
@@ -202,14 +204,17 @@ export class NotificationsService implements OnModuleInit {
         dedupeKey: `test-${user.id}-${Date.now()}`,
       },
     });
-    const emailStatus = await this.mailer.send(user.email, created.title, created.body);
+    const [emailStatus, pushStatus] = await Promise.all([
+      this.mailer.send(user.email, created.title, created.body),
+      this.pusher.sendToUser(user.id, { title: created.title, body: created.body, link: '/panel/notificaciones' }),
+    ]);
     await this.prisma.delivery.createMany({
       data: [
-        { channel: 'PUSH', recipient: user.id, subject: created.title, status: 'SIMULATED' },
+        { channel: 'PUSH', recipient: user.id, subject: created.title, status: pushStatus },
         { channel: 'EMAIL', recipient: user.email.toLowerCase(), subject: created.title, status: emailStatus },
       ],
     });
-    return { ...created, emailStatus };
+    return { ...created, emailStatus, pushStatus };
   }
 
   deliveries(limit = 100) {

@@ -15,7 +15,9 @@ microservicios independientes. El README.md documenta todo; aquí van solo la es
     como repositorio independiente `github.com/javierlydiaz21-bit/sportsleague-<servicio>` con
     `git subtree split`. Se edita siempre aquí, en el repositorio principal.
   - Correo real: Notification envía por HTTPS a un Google Apps Script (`MAIL_RELAY_URL`,
-    `MAIL_RELAY_SECRET`) porque Render Free bloquea SMTP. Sin esas variables, simulado.
+    `MAIL_RELAY_SECRET`) porque Render Free bloquea SMTP. Push real: Web Push con claves VAPID
+    (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`) y el service worker `frontend/public/sw.js`. Sin esas
+    variables, ambos canales quedan simulados. Nunca subas las claves privadas al repositorio.
   - El documento de arquitectura del equipo (`SPORTSLEAGUE-ARQUITECTURA.pdf`, no está en el repo)
     es la referencia de requisitos; las diferencias están en «Decisiones respecto al documento» del README.
 - `chassis/`: código común. Se COPIA a `services/*/src/chassis` con `node scripts/sync-chassis.mjs`.

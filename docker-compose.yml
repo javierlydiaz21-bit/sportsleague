@@ -147,6 +147,10 @@ services:
       MAIL_RELAY_URL: ${MAIL_RELAY_URL:-}
       MAIL_RELAY_SECRET: ${MAIL_RELAY_SECRET:-}
       WEB_URL: http://localhost:3000
+      # Push real en el navegador (Web Push): claves de `npx web-push generate-vapid-keys`; vacías = simulado.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@sportsleague.com}
 
   analytics-service:
     <<: *service

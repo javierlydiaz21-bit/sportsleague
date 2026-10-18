@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict CRSgQKrjiEpD5BdCuFq5teGNJLCPQkdYMgpNiZ2KwN33ZAawOAARW02PA7qetic
+\restrict 8r6fIb5gzUDTrqunCRUocaZzLRWXoXPffhMGsUwhGCL2dNwd4ktsCyjCYcPvSsH
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -85,6 +85,21 @@ CREATE TABLE public.preferences (
 
 
 --
+-- Name: push_subscriptions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.push_subscriptions (
+    id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    endpoint text NOT NULL,
+    p256dh text NOT NULL,
+    auth text NOT NULL,
+    user_agent text,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: subscriptions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -127,6 +142,14 @@ ALTER TABLE ONLY public.notifications
 
 ALTER TABLE ONLY public.preferences
     ADD CONSTRAINT preferences_pkey PRIMARY KEY (user_id);
+
+
+--
+-- Name: push_subscriptions push_subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_subscriptions
+    ADD CONSTRAINT push_subscriptions_pkey PRIMARY KEY (id);
 
 
 --
@@ -173,6 +196,20 @@ CREATE INDEX notifications_user_id_idx ON public.notifications USING btree (user
 
 
 --
+-- Name: push_subscriptions_endpoint_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX push_subscriptions_endpoint_key ON public.push_subscriptions USING btree (endpoint);
+
+
+--
+-- Name: push_subscriptions_user_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX push_subscriptions_user_id_idx ON public.push_subscriptions USING btree (user_id);
+
+
+--
 -- Name: subscriptions_league_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -190,5 +227,5 @@ CREATE UNIQUE INDEX subscriptions_user_id_league_id_key ON public.subscriptions 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict CRSgQKrjiEpD5BdCuFq5teGNJLCPQkdYMgpNiZ2KwN33ZAawOAARW02PA7qetic
+\unrestrict 8r6fIb5gzUDTrqunCRUocaZzLRWXoXPffhMGsUwhGCL2dNwd4ktsCyjCYcPvSsH
 

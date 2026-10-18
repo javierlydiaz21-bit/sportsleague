@@ -178,7 +178,7 @@ export function SystemHealthView() {
       <section>
         <SectionTitle
           title="Envíos de notificaciones"
-          description="Correo (real con Gmail si MAIL_RELAY_URL está configurada) y push (simulado) registrados por el Notification Service."
+          description="Correo (Gmail) y push (Web Push) registrados por el Notification Service. «Simulado»: canal sin configurar o usuario sin navegadores suscritos."
         />
         <Table>
           <thead>
