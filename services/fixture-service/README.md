@@ -217,6 +217,25 @@ En el gateway, las rutas `/api/v1/matches/:id/events`, `/live`, `/start` y `/com
 Service; el resto de `/api/v1/matches/*`, `/api/v1/fixtures/*` y `/api/v1/seasons/:id/fixtures/*` llega a
 este servicio.
 
+### Ejemplo: generar, publicar y reprogramar el calendario
+
+Requisitos: la liga debe estar *aprobada* por el administrador, y la categoría debe tener al
+menos 2 equipos y canchas con días y horario disponibles. Con la pila local y la cuenta
+organizador@demo.com (el TOKEN se obtiene con POST /auth/login):
+
+```bash
+API=http://localhost:4000/api/v1
+
+# 1. Generar el borrador: sábados y domingos desde el 7 de noviembre, con 3 días de descanso mínimo
+curl -s -X POST $API/seasons/<id de la temporada>/fixtures/generate -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"categoryId":"<id de la categoría>","startDate":"2026-11-07","matchDays":[6,0],"minRestDays":3}'
+# → calendario en estado DRAFT; con 4 equipos: 3 jornadas y 6 partidos (local, visitante, cancha y hora)
+
+# 2. Publicar: emite fixture.published por cada jornada; Referee asigna los árbitros
+#    automáticamente y Notification avisa a los seguidores de la liga
+curl -s -X POST $API/fixtures/<id del calendario>/publish
+
 ## Eventos
 
 Se publican en **Redis Pub/Sub**: el canal es el nombre del evento y el mensaje es un sobre JSON
