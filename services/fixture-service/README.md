@@ -235,7 +235,7 @@ curl -s -X POST $API/seasons/<id de la temporada>/fixtures/generate -H "authoriz
 # 2. Publicar: emite fixture.published por cada jornada; Referee asigna los árbitros
 #    automáticamente y Notification avisa a los seguidores de la liga
 curl -s -X POST $API/fixtures/<id del calendario>/publish
-
+```
 ## Eventos
 
 Se publican en **Redis Pub/Sub**: el canal es el nombre del evento y el mensaje es un sobre JSON
