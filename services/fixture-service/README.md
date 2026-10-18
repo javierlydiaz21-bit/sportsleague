@@ -236,6 +236,7 @@ curl -s -X POST $API/seasons/<id de la temporada>/fixtures/generate -H "authoriz
 #    automáticamente y Notification avisa a los seguidores de la liga
 curl -s -X POST $API/fixtures/<id del calendario>/publish
 ```
+
 ## Eventos
 
 Se publican en **Redis Pub/Sub**: el canal es el nombre del evento y el mensaje es un sobre JSON
