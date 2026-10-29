@@ -377,14 +377,26 @@ npm run start:dev
 
 ## CI/CD y despliegue
 
-- `.github/workflows/<servicio>.yml`: se dispara solo cuando cambia ese servicio y llama a
-  `service-pipeline.yml`: **npm ci → ESLint → Jest (con cobertura) → build → (k6 en Live Score)
-  → imagen Docker publicada en GHCR** (`ghcr.io/<owner>/sportsleague-app-<servicio>:<sha>`) →
-  **despliegue en Render** con rolling update (solo en `main`). El prefijo `sportsleague-app-`
-  evita chocar con los paquetes `sportsleague-<servicio>` del proyecto anterior (`sportsleague-ms`),
-  en los que este repositorio no tiene permiso de escritura.
-- Secretos por servicio: `RENDER_DEPLOY_HOOK_<SERVICIO>` (p. ej. `RENDER_DEPLOY_HOOK_LIVE_SCORE`).
-  Sin el secreto, el despliegue se omite sin fallar.
+- **Un solo CI para todos los servicios**: `ci-servicio.yml` es un workflow reutilizable con tres
+  jobs: *Lint, pruebas y build* (npm ci → Prisma → ESLint → Jest con cobertura → build), *Escaneo
+  de secretos* (gitleaks sobre todo el historial, con los valores ocultos en el log) e *Imagen
+  Docker* (construye sin publicar). Lo usan los 10 repositorios de servicio con `@v1` y este
+  repositorio antes de publicar cada imagen: lo que se prueba en un repositorio es lo mismo que
+  se prueba antes de desplegar. Un cambio compatible mueve la etiqueta `v1`
+  (`git tag -f v1 && git push -f origin v1`); uno incompatible va en `v2`.
+- `.github/workflows/<servicio>.yml`: se dispara solo cuando cambia ese servicio (o el CI
+  compartido) y llama a `service-pipeline.yml`: **ci-servicio → (k6 en Live Score) → imagen Docker
+  publicada en GHCR** (`ghcr.io/<owner>/sportsleague-app-<servicio>:<sha>`) → **despliegue en
+  Render** con rolling update (solo en `main`). El prefijo `sportsleague-app-` evita chocar con los
+  paquetes `sportsleague-<servicio>` del proyecto anterior (`sportsleague-ms`), en los que este
+  repositorio no tiene permiso de escritura.
+- **Credenciales**: el único secreto es el deploy hook de Render de cada servicio
+  (`RENDER_DEPLOY_HOOK_<SERVICIO>`, p. ej. `RENDER_DEPLOY_HOOK_LIVE_SCORE`), y solo lo lee el job de
+  despliegue; sin él, el despliegue se omite sin fallar. Los repositorios de servicio no tienen
+  secretos. El `GITHUB_TOKEN` es de solo lectura salvo `packages: write` en el job que publica la
+  imagen, los checkout no guardan la credencial (`persist-credentials: false`), las acciones
+  están fijadas por SHA y gitleaks se verifica con su SHA-256 antes de ejecutarse. gitleaks solo
+  permite, por valor exacto, el token de desarrollo `dev-internal-token-change-me` de los ejemplos.
 - **Rollback**: volver a desplegar en Render la imagen de un `sha` anterior (todas quedan versionadas en GHCR).
 - **Migraciones**: cada contenedor ejecuta `prisma migrate deploy` antes de recibir tráfico.
 - **Frontend**: `frontend.yml` hace lint, chequeo de tipos y build; el despliegue lo hace
@@ -400,8 +412,8 @@ npm run start:dev
 ### Un repositorio por microservicio
 
 Además de este repositorio principal (donde se trabaja), cada servicio está publicado con su
-historial como repositorio independiente, con su README, `.env.example`, `database/` y CI propio
-(lint, Jest, build e imagen Docker en cada push y Pull Request a `main` y `develop`):
+historial como repositorio independiente, con su README, `.env.example`, `database/` y su CI
+(`ci-servicio.yml@v1` en cada push y Pull Request a `main` y `develop`):
 
 | Servicio | Repositorio |
 |---|---|
@@ -416,8 +428,8 @@ historial como repositorio independiente, con su README, `.env.example`, `databa
 | Notification | https://github.com/javierlydiaz21-bit/sportsleague-notification-service |
 | Analytics | https://github.com/javierlydiaz21-bit/sportsleague-analytics-service |
 
-En cada uno, `main` exige Pull Request con los checks *Lint, pruebas y build* e *Imagen Docker* en
-verde. Para llevar a un repositorio los cambios hechos aquí:
+En cada uno, `main` exige Pull Request con los checks *ci / Lint, pruebas y build*, *ci / Escaneo
+de secretos* y *ci / Imagen Docker* en verde. Para llevar a un repositorio los cambios hechos aquí:
 
 ```bash
 git subtree split --prefix=services/fixture-service -b split/fixture-service
