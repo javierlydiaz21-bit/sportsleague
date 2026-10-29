@@ -7,10 +7,13 @@ on:
       - 'services/referee-service/**'
       - '.github/workflows/referee-service.yml'
       - '.github/workflows/service-pipeline.yml'
+      - '.github/workflows/ci-servicio.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'services/referee-service/**'
+      - '.github/workflows/service-pipeline.yml'
+      - '.github/workflows/ci-servicio.yml'
 
 permissions:
   contents: read

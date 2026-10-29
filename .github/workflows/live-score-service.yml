@@ -7,11 +7,14 @@ on:
       - 'services/live-score-service/**'
       - '.github/workflows/live-score-service.yml'
       - '.github/workflows/service-pipeline.yml'
+      - '.github/workflows/ci-servicio.yml'
       - 'load-tests/**'
   pull_request:
     branches: [main, develop]
     paths:
       - 'services/live-score-service/**'
+      - '.github/workflows/service-pipeline.yml'
+      - '.github/workflows/ci-servicio.yml'
       - 'load-tests/**'
 
 permissions:

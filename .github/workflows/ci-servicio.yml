@@ -1,0 +1,118 @@
+# CI compartido de los microservicios de SportsLeague (workflow reutilizable).
+#
+# Lo llaman los 10 repositorios de servicio (javierlydiaz21-bit/sportsleague-<servicio>) con @v1 y,
+# en este repositorio, service-pipeline.yml antes de publicar la imagen: lo que se prueba en cada
+# repositorio es exactamente lo que se prueba antes de desplegar. Un cambio compatible mueve la
+# etiqueta v1; uno incompatible va en v2 para no romper a los repositorios que usan v1.
+#
+# Seguridad: acciones fijadas por SHA, GITHUB_TOKEN de solo lectura, checkout sin guardar
+# credenciales en disco y gitleaks verificado con su SHA-256 antes de ejecutarse. Este workflow no
+# recibe ningún secreto: no despliega.
+name: ci-servicio
+
+on:
+  workflow_call:
+    inputs:
+      path:
+        description: Carpeta del servicio ('.' en su propio repositorio, services/<servicio> en el principal)
+        type: string
+        default: '.'
+      docker:
+        description: Construir la imagen Docker sin publicarla, para comprobar el Dockerfile
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Lint, pruebas y build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.path }}
+    env:
+      INTERNAL_API_TOKEN: ci-internal-token
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ inputs.path }}/package-lock.json
+
+      - name: Instalar dependencias (npm ci)
+        run: npm ci --no-audit --no-fund
+
+      - name: Generar cliente Prisma
+        if: hashFiles(format('{0}/prisma/schema.prisma', inputs.path)) != ''
+        run: npx prisma generate
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Pruebas unitarias e integración (Jest)
+        run: npm test -- --ci --coverage
+
+      - name: Compilar
+        run: npm run build
+
+  secret-scan:
+    name: Escaneo de secretos
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+      SCAN_PATH: ${{ inputs.path }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Instalar gitleaks verificando su SHA-256
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl -sSfL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check --strict
+          tar -xzf gitleaks.tar.gz gitleaks
+
+      # Reglas por defecto de gitleaks. Se permite solo, por valor exacto, el token de desarrollo
+      # local que aparece en los ejemplos curl de los README (valor por defecto de docker-compose,
+      # no es una credencial real): cualquier otro valor en esa misma línea se sigue detectando.
+      - name: Escanear todo el historial (valores ocultos en el log)
+        run: |
+          cat > "$RUNNER_TEMP/gitleaks.toml" <<'EOF'
+          [extend]
+          useDefault = true
+
+          [[allowlists]]
+          description = "Token interno de desarrollo documentado en los README"
+          regexes = ['''^dev-internal-token-change-me$''']
+          EOF
+          "$RUNNER_TEMP/gitleaks" git . --config "$RUNNER_TEMP/gitleaks.toml" --redact --no-banner --log-opts="--all -- ${SCAN_PATH}"
+
+  image:
+    name: Imagen Docker
+    if: inputs.docker
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Construir la imagen (sin publicar)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ inputs.path }}
+          push: false
+          tags: sportsleague-ci:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

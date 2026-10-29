@@ -7,10 +7,13 @@ on:
       - 'services/api-gateway/**'
       - '.github/workflows/api-gateway.yml'
       - '.github/workflows/service-pipeline.yml'
+      - '.github/workflows/ci-servicio.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'services/api-gateway/**'
+      - '.github/workflows/service-pipeline.yml'
+      - '.github/workflows/ci-servicio.yml'
 
 permissions:
   contents: read

@@ -7,10 +7,13 @@ on:
       - 'services/auth-service/**'
       - '.github/workflows/auth-service.yml'
       - '.github/workflows/service-pipeline.yml'
+      - '.github/workflows/ci-servicio.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'services/auth-service/**'
+      - '.github/workflows/service-pipeline.yml'
+      - '.github/workflows/ci-servicio.yml'
 
 permissions:
   contents: read
