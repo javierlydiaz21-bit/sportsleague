@@ -37,6 +37,10 @@ microservicios independientes. El README.md documenta todo; aquí van solo la es
 - `scripts/seed-demo.mjs`: demo determinista e idempotente (`docker compose --profile demo run --rm seed`).
 - `iniciar.ps1` / `iniciar.bat` / `detener.bat` / `iniciar.sh`: arranque en un clic.
 - `.github/workflows/` + `render.yaml`: CI/CD (GHCR + Render); el frontend se despliega en Vercel.
+  `ci-servicio.yml` es el CI compartido (lint, pruebas, build, gitleaks e imagen): lo llaman
+  `service-pipeline.yml` y los 10 repos de servicio con `@v1`. Tras cambiarlo, mueve la etiqueta `v1`
+  si el cambio es compatible (o crea `v2`). Las acciones van fijadas por SHA con su versión en un
+  comentario; actualiza ambos a la vez.
   Repositorio: github.com/javierlydiaz21-bit/sportsleague. Imágenes:
   `ghcr.io/javierlydiaz21-bit/sportsleague-app-<servicio>`. No uses `sportsleague-<servicio>`:
   esos paquetes son del proyecto anterior (`sportsleague-ms`) y este repo no puede escribir en ellos.

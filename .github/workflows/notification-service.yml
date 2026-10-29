@@ -7,10 +7,13 @@ on:
       - 'services/notification-service/**'
       - '.github/workflows/notification-service.yml'
       - '.github/workflows/service-pipeline.yml'
+      - '.github/workflows/ci-servicio.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'services/notification-service/**'
+      - '.github/workflows/service-pipeline.yml'
+      - '.github/workflows/ci-servicio.yml'
 
 permissions:
   contents: read
