@@ -169,15 +169,32 @@ curl -X POST http://localhost:4001/api/v1/auth/login \
 
 ```bash
 npm ci
-npx prisma generate     # genera los tipos del cliente de Prisma
-npm run lint            # ESLint sobre src/ y test/
-npm test                # Jest: src/**/*.spec.ts (unitarias) y test/*.e2e.spec.ts (integración HTTP)
-npm run test:cov        # igual, con informe de cobertura en coverage/
+npx prisma generate        # genera los tipos del cliente de Prisma
+npm run lint               # ESLint sobre src/ y test/
+npm test                   # todas las pruebas (unitarias e integración)
+npm run test:unit          # unitarias: src/**/*.spec.ts
+npm run test:integration   # integración: test/**/*.spec.ts
+npm run test:cov           # todas, con el informe de cobertura
 ```
 
-Las pruebas no necesitan PostgreSQL ni Redis: usan una base de datos simulada en memoria
-(`test/fake-prisma.ts`), un Redis falso y el bus de eventos en memoria. Cubren, entre otros, la rotación
-de refresh tokens, la detección de reutilización, el CSRF y la gestión de cuentas.
+| Tipo | Archivo | Qué prueba | Qué se simula |
+|---|---|---|---|
+| Unitaria | `src/auth/tokens.spec.ts` | Firma y verificación del access token, tokens aleatorios, hashes y lectura de cookies | Nada (funciones puras) |
+| Unitaria | `src/auth/auth.service.spec.ts` | Registro con `user.registered`, correo repetido, credenciales inválidas y cuentas suspendidas, rotación del refresh token con CSRF, detección de reutilización y cuenta de administrador única | Prisma (`test/fake-prisma.ts`, en memoria) y el bus de eventos |
+| Unitaria | `src/users/users.service.spec.ts` | Suspender (revoca sesiones, marca en Redis y publica `user.updated`), reactivar y que el administrador no se cambie a sí mismo | Prisma, Redis y el bus de eventos (`jest.fn()`) |
+| Integración HTTP | `test/auth.e2e.spec.ts` | Token interno del gateway, validación en español, cookie httpOnly con refresco por CSRF y listado solo para `ADMIN` | Prisma (en memoria), Redis y el bus de eventos |
+| Integración con PostgreSQL | `test/integration/auth.integration.spec.ts` | Cuenta de administrador única al arrancar → registro (bcrypt, refresh token y CSRF guardados solo como hash, cookie httpOnly, JWT verificable, `user.registered`) → login (mismo mensaje con contraseña errónea o correo inexistente) → rotación del refresh token (403 sin CSRF) → reutilización de un token rotado que cierra todas las sesiones → suspensión por el administrador (sesiones revocadas, marca en Redis, `user.updated`, login 403); 409, 400 y 403; `/metrics` | Solo Redis (bus de eventos en memoria y doble del cliente) |
+
+La prueba de integración con PostgreSQL usa `TEST_DATABASE_URL`. Por defecto es la PostgreSQL de Docker
+Compose del repositorio principal (`docker compose up -d postgres`):
+`postgresql://postgres:postgres@localhost:5440/auth_db?schema=pruebas`. Crea un esquema propio por ejecución (`pruebas_<sufijo aleatorio>`) con las
+migraciones, lo borra al terminar y se niega a ejecutarse si la URL no indica un esquema propio, para no
+tocar los datos de desarrollo. En GitHub Actions corre contra un contenedor `postgres:16-alpine`. Como
+cada ejecución usa su propio esquema, dos ejecuciones a la vez no chocan.
+
+La cobertura se mide sobre todo `src/` salvo `main.ts` y las pruebas, incluido `src/chassis/`. El informe
+queda en `coverage/lcov-report/index.html` y el resumen en `coverage/coverage-summary.json`. En GitHub
+Actions se guarda como artefacto `coverage-auth-service`.
 
 ## Endpoints principales
 

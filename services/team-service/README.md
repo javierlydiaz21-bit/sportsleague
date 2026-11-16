@@ -169,15 +169,32 @@ curl "http://localhost:4003/api/v1/teams?leagueId=<uuid-de-la-liga>" -H "x-inter
 
 ```bash
 npm ci
-npx prisma generate     # genera los tipos del cliente de Prisma
-npm run lint            # ESLint sobre src/ y test/
-npm test                # Jest: src/**/*.spec.ts (unitarias) y test/*.e2e.spec.ts (integración HTTP)
-npm run test:cov        # igual, con informe de cobertura en coverage/
+npx prisma generate        # genera los tipos del cliente de Prisma
+npm run lint               # ESLint sobre src/ y test/
+npm test                   # todas las pruebas (unitarias e integración)
+npm run test:unit          # unitarias: src/**/*.spec.ts
+npm run test:integration   # integración: test/**/*.spec.ts
+npm run test:cov           # todas, con el informe de cobertura
 ```
 
-Las pruebas no necesitan PostgreSQL, Redis ni el League Service: usan dobles en memoria. Cubren el
-cálculo de la edad (incluido el día del cumpleaños), los tres estados de elegibilidad, el caso de League
-Service caído (jugador pendiente) y que solo el organizador de la liga registre equipos.
+| Tipo | Archivo | Qué prueba | Qué se simula |
+|---|---|---|---|
+| Unitaria | `src/teams/eligibility.spec.ts` | Edad cumplida (incluido el día del cumpleaños), los tres estados de elegibilidad, categorías sin límite y colores de equipo | Nada (funciones puras) |
+| Unitaria | `src/teams/teams.service.spec.ts` | Solo el organizador de la liga registra equipos; elegibilidad al fichar; jugador pendiente si no se puede consultar la categoría | Prisma y el cliente de League Service (`jest.fn()`) |
+| Integración HTTP | `test/teams.e2e.spec.ts` | Rutas, filtros obligatorios y validación de los DTO | Prisma, Redis y el bus de eventos |
+| Integración con PostgreSQL | `test/integration/team.integration.spec.ts` | Registrar equipo → fichar jugadores (elegible y no elegible según el rango de la categoría) → `GET /teams/:id/players`; 404 si la categoría no existe, 409 por camiseta repetida, 400 por camiseta fuera de rango; League Service caído (rango en caché y, sin caché, jugador pendiente); documento visible solo al organizador; `/metrics` | League Service (servidor HTTP local) y Redis |
+
+La prueba de integración con PostgreSQL usa `TEST_DATABASE_URL`. Por defecto es la PostgreSQL de Docker
+Compose del repositorio principal (`docker compose up -d postgres`):
+`postgresql://postgres:postgres@localhost:5440/team_db?schema=pruebas`. Crea un esquema propio por ejecución (`pruebas_<sufijo aleatorio>`) con las
+migraciones, lo borra al terminar y se niega a ejecutarse si la URL no indica un esquema propio, para no
+tocar los datos de desarrollo. En GitHub Actions corre contra un contenedor `postgres:16-alpine`. El
+League Service se simula con un servidor HTTP en un puerto libre (`LEAGUE_SERVICE_URL`), de modo que la
+llamada pasa por el cliente real (token interno, reintentos y circuit breaker).
+
+La cobertura se mide sobre todo `src/` salvo `main.ts` y las pruebas, incluido `src/chassis/`. El informe
+queda en `coverage/lcov-report/index.html` y el resumen en `coverage/coverage-summary.json`. En GitHub
+Actions se guarda como artefacto `coverage-team-service`.
 
 ## Endpoints principales
 

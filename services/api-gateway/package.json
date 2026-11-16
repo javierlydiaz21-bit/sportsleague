@@ -14,6 +14,8 @@
     "start:prod": "node dist/main.js",
     "lint": "eslint src test",
     "test": "jest",
+    "test:unit": "jest src",
+    "test:integration": "jest test",
     "test:cov": "jest --coverage"
   },
   "dependencies": {
@@ -65,10 +67,21 @@
     "collectCoverageFrom": [
       "src/**/*.ts",
       "!src/main.ts",
-      "!src/chassis/**"
+      "!src/**/*.spec.ts"
     ],
     "coverageDirectory": "coverage",
     "testEnvironment": "node",
-    "testTimeout": 20000
+    "testTimeout": 20000,
+    "coverageReporters": [
+      "text",
+      "text-summary",
+      "lcov",
+      "json-summary"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "lines": 50
+      }
+    }
   }
 }

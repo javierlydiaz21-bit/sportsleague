@@ -175,18 +175,33 @@ curl "http://localhost:4004/api/v1/matches?status=SCHEDULED" -H "x-internal-toke
 
 ```bash
 npm ci
-npx prisma generate     # genera los tipos del cliente de Prisma
-npm run lint            # ESLint sobre src/ y test/
-npm test                # Jest: src/**/*.spec.ts (unitarias) y test/*.e2e.spec.ts (integración HTTP)
-npm run test:cov        # igual, con informe de cobertura en coverage/
+npx prisma generate        # genera los tipos del cliente de Prisma
+npm run lint               # ESLint sobre src/ y test/
+npm test                   # todas las pruebas (unitarias e integración)
+npm run test:unit          # unitarias: src/**/*.spec.ts
+npm run test:integration   # integración: test/**/*.spec.ts
+npm run test:cov           # todas, con el informe de cobertura
 ```
 
-Las pruebas no necesitan PostgreSQL, Redis ni los otros servicios: usan dobles en memoria. Cubren las
-propiedades del round-robin (con 2 a 10 equipos todos se enfrentan exactamente una vez, nadie juega dos
-veces en la misma jornada, la localía queda equilibrada y en ida y vuelta cada cruce se juega una vez
-con cada equipo de local), el motor del calendario (días de juego, descanso mínimo, sin repetir cancha y hora, cancha propia, falta de
-capacidad), las reglas de negocio (liga aprobada, organizador, mínimo de equipos, calendario publicado) y
-la actualización idempotente del estado con `match.completed`.
+| Tipo | Archivo | Qué prueba | Qué se simula |
+|---|---|---|---|
+| Unitaria | `src/fixtures/scheduler.spec.ts` | Round-robin (con 2 a 10 equipos todos se enfrentan una vez, nadie juega dos veces por jornada, localía equilibrada, ida y vuelta) y motor del calendario (días de juego, descanso mínimo, sin repetir cancha y hora, cancha propia, falta de capacidad) | Nada (funciones puras) |
+| Unitaria | `src/fixtures/fixtures.service.spec.ts` | Reglas de negocio: calendario en borrador, liga aprobada, organizador, mínimo de equipos, calendario publicado y actualización idempotente con `match.completed` | Prisma, el bus de eventos y los clientes de League y Team Service (`jest.fn()`) |
+| Integración HTTP | `test/fixtures.e2e.spec.ts` | Rutas, roles, validación de los DTO y visibilidad del calendario público | Prisma, Redis y el bus de eventos |
+| Integración con PostgreSQL | `test/integration/fixture.integration.spec.ts` | Generar el calendario → verlo como borrador → publicarlo (`fixture.published` por jornada) → suspender y reprogramar un partido (`match.suspended`, `match.rescheduled`); 409 al regenerar uno publicado, 400 con una cancha ajena; estado del partido con `match.started` y `match.completed`; `/metrics` | League Service y Team Service (servidor HTTP local) y Redis (bus de eventos en memoria) |
+
+La prueba de integración con PostgreSQL usa `TEST_DATABASE_URL`. Por defecto es la PostgreSQL de Docker
+Compose del repositorio principal (`docker compose up -d postgres`):
+`postgresql://postgres:postgres@localhost:5440/fixture_db?schema=pruebas`. Crea un esquema propio por ejecución (`pruebas_<sufijo aleatorio>`) con
+las migraciones, lo borra al terminar y se niega a ejecutarse si la URL no indica un esquema propio, para
+no tocar los datos de desarrollo. En GitHub Actions corre contra un contenedor `postgres:16-alpine`.
+League Service y Team Service se simulan con un servidor HTTP en un puerto libre (`LEAGUE_SERVICE_URL` y
+`TEAM_SERVICE_URL`), de modo que las llamadas pasan por el cliente real (token interno, reintentos y
+circuit breaker).
+
+La cobertura se mide sobre todo `src/` salvo `main.ts` y las pruebas, incluido `src/chassis/`. El informe
+queda en `coverage/lcov-report/index.html` y el resumen en `coverage/coverage-summary.json`. En GitHub
+Actions se guarda como artefacto `coverage-fixture-service`.
 
 ## Endpoints principales
 

@@ -16,15 +16,14 @@ export interface BootstrapOptions {
   configure?: (app: NestExpressApplication) => void | Promise<void>;
 }
 
-/** Arranque estándar de todos los microservicios (mismo comportamiento, código independiente). */
-export async function bootstrapService(rootModule: any, options: BootstrapOptions): Promise<NestExpressApplication> {
-  configureService(options.name);
-  initMetrics(serviceInfo.name);
+export type AppSetupOptions = Pick<BootstrapOptions, 'bodyParser' | 'routeFromPath'>;
 
-  const app = await NestFactory.create<NestExpressApplication>(rootModule, {
-    logger: new JsonLogger(),
-    bodyParser: false,
-  });
+/**
+ * Middleware de métricas y logs, cuerpo JSON, prefijo /api/v1, validación y filtro de errores.
+ * Lo usan el arranque y las pruebas de integración, para que estas pasen por lo mismo que producción.
+ * La app debe crearse con { bodyParser: false }.
+ */
+export function configureApp(app: NestExpressApplication, options: AppSetupOptions = {}): void {
   app.disable('x-powered-by');
   // Los servicios solo reciben tráfico desde la red privada (gateway): se confía en su X-Forwarded-For.
   app.set('trust proxy', process.env.TRUST_PROXY ?? 'loopback, linklocal, uniquelocal');
@@ -35,6 +34,18 @@ export async function bootstrapService(rootModule: any, options: BootstrapOption
   app.setGlobalPrefix('api/v1', { exclude: ['health', 'status', 'metrics'] });
   app.useGlobalPipes(createValidationPipe());
   app.useGlobalFilters(new AllExceptionsFilter());
+}
+
+/** Arranque estándar de todos los microservicios (mismo comportamiento, código independiente). */
+export async function bootstrapService(rootModule: any, options: BootstrapOptions): Promise<NestExpressApplication> {
+  configureService(options.name);
+  initMetrics(serviceInfo.name);
+
+  const app = await NestFactory.create<NestExpressApplication>(rootModule, {
+    logger: new JsonLogger(),
+    bodyParser: false,
+  });
+  configureApp(app, options);
   app.enableShutdownHooks();
 
   await options.configure?.(app);
