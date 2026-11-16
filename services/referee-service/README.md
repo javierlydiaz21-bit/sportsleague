@@ -169,16 +169,30 @@ curl "http://localhost:4005/api/v1/internal/assignments/check?matchId=<uuid-del-
 
 ```bash
 npm ci
-npx prisma generate     # genera los tipos del cliente de Prisma
-npm run lint            # ESLint sobre src/ y test/
-npm test                # Jest: src/**/*.spec.ts (unitarias) y test/*.e2e.spec.ts (integración HTTP)
-npm run test:cov        # igual, con informe de cobertura en coverage/
+npx prisma generate        # genera los tipos del cliente de Prisma
+npm run lint               # ESLint sobre src/ y test/
+npm test                   # todas las pruebas (unitarias e integración)
+npm run test:unit          # unitarias: src/**/*.spec.ts
+npm run test:integration   # integración: test/**/*.spec.ts
+npm run test:cov           # todas, con el informe de cobertura
 ```
 
-Las pruebas no necesitan PostgreSQL ni Redis: usan dobles en memoria. Cubren la conversión a la hora
-local de la liga, la prioridad por zona, los descartes (sin disponibilidad, de otra liga, no certificado
-o inactivo), los cruces de horario y el reparto de carga, la exclusión de quien rechazó, la asignación
-automática con `fixture.published`, su idempotencia y el aviso `referee.unassigned`.
+| Tipo | Archivo | Qué prueba | Qué se simula |
+|---|---|---|---|
+| Unitaria | `src/assignments/matching.spec.ts` | Hora local de la liga, prioridad por zona, descartes (sin disponibilidad, de otra liga, no certificado o inactivo), cruces de horario, reparto de carga y exclusión de quien rechazó | Nada (funciones puras) |
+| Unitaria | `src/assignments/referees.service.spec.ts` | Asignación automática con `fixture.published`, su idempotencia y el aviso `referee.unassigned` | Prisma y el bus de eventos (`jest.fn()`) |
+| Integración HTTP | `test/referees.e2e.spec.ts` | Consulta interna de asignación, validación de la disponibilidad y roles | Prisma, Redis y el bus de eventos |
+| Integración con PostgreSQL | `test/integration/referee.integration.spec.ts` | Registrar árbitros → `fixture.published` → asignación por zona (`referee.assigned`) → el árbitro ve y confirma su partido → otro rechaza y se asigna un reemplazo; 409 por correo repetido, 400 por franja invertida, 403 si un aficionado confirma; idempotencia; `referee.unassigned` sin árbitros ese día; consulta interna del Live Score Service; `/metrics` | Solo Redis (bus de eventos en memoria) |
+
+La prueba de integración con PostgreSQL usa `TEST_DATABASE_URL`. Por defecto es la PostgreSQL de Docker
+Compose del repositorio principal (`docker compose up -d postgres`):
+`postgresql://postgres:postgres@localhost:5440/referee_db?schema=pruebas`. Crea un esquema propio por ejecución (`pruebas_<sufijo aleatorio>`) con
+las migraciones, lo borra al terminar y se niega a ejecutarse si la URL no indica un esquema propio, para
+no tocar los datos de desarrollo. En GitHub Actions corre contra un contenedor `postgres:16-alpine`.
+
+La cobertura se mide sobre todo `src/` salvo `main.ts` y las pruebas, incluido `src/chassis/`. El informe
+queda en `coverage/lcov-report/index.html` y el resumen en `coverage/coverage-summary.json`. En GitHub
+Actions se guarda como artefacto `coverage-referee-service`.
 
 ## Endpoints principales
 

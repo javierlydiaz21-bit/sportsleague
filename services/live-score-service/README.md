@@ -178,17 +178,37 @@ curl http://localhost:4006/api/v1/live/matches -H "x-internal-token: dev-interna
 
 ```bash
 npm ci
-npx prisma generate     # genera los tipos del cliente de Prisma
-npm run lint            # ESLint sobre src/ y test/
-npm test                # Jest: src/**/*.spec.ts (unitarias) y test/*.e2e.spec.ts (integración HTTP y WebSocket)
-npm run test:cov        # igual, con informe de cobertura en coverage/
+npx prisma generate        # genera los tipos del cliente de Prisma
+npm run lint               # ESLint sobre src/ y test/
+npm test                   # todas las pruebas (unitarias e integración)
+npm run test:unit          # unitarias: src/**/*.spec.ts
+npm run test:integration   # integración: test/**/*.spec.ts
+npm run test:cov           # todas, con el informe de cobertura
 ```
 
-Las pruebas no necesitan PostgreSQL, Redis ni los otros servicios: usan dobles en memoria y un cliente
-Socket.IO real. Cubren el cálculo del marcador (también canastas de 2 y 3 puntos), los permisos del
-árbitro asignado, la validación de equipo y plantilla, el acta versionada y sus correcciones, y la
-difusión por WebSocket en `/live` y `/live-scores`. En el pipeline de CI también se ejecuta una prueba de
-carga con k6 (`load-tests/live-score.js` del repositorio principal) que simula varias jornadas a la vez.
+| Tipo | Archivo | Qué prueba | Qué se simula |
+|---|---|---|---|
+| Unitaria | `src/live/score.spec.ts` | Cálculo del marcador (también canastas de 2 y 3 puntos) y valor normalizado de los eventos | Nada (funciones puras) |
+| Unitaria | `src/live/live.service.spec.ts` | Permisos del árbitro asignado, validación de equipo y plantilla, acta versionada y sus correcciones | Prisma, la caché, el bus de eventos y los clientes de los otros servicios (`jest.fn()`) |
+| Unitaria | `src/live/io.adapter.spec.ts` | Orígenes permitidos del WebSocket (web, clientes sin `Origin` y la app móvil) | Nada (adaptador real) |
+| Integración HTTP y WebSocket | `test/live.e2e.spec.ts` | Marcador público, sesión obligatoria y difusión por `/live` y `/live-scores` con un cliente Socket.IO real | Prisma, Redis y el bus de eventos |
+| Integración con PostgreSQL | `test/integration/live.integration.spec.ts` | Iniciar el partido (árbitro asignado) → un espectador por WebSocket recibe el gol al instante → finalizar (acta `match.completed`) → corrección del organizador (versión 2); 409 con calendario en borrador, 400 con un jugador de otro equipo, 403 a un árbitro no asignado y al árbitro tras el cierre; `/metrics` (incluida la latencia del marcador en vivo) | Fixture, Referee y Team Service (servidor HTTP local) y Redis |
+
+La prueba de integración con PostgreSQL usa `TEST_DATABASE_URL`. Por defecto es la PostgreSQL de Docker
+Compose del repositorio principal (`docker compose up -d postgres`):
+`postgresql://postgres:postgres@localhost:5440/livescore_db?schema=pruebas`. Crea un esquema propio por ejecución (`pruebas_<sufijo aleatorio>`) con
+las migraciones, lo borra al terminar y se niega a ejecutarse si la URL no indica un esquema propio, para
+no tocar los datos de desarrollo. En GitHub Actions corre contra un contenedor `postgres:16-alpine`.
+Fixture, Referee y Team Service se simulan con un servidor HTTP en un puerto libre
+(`FIXTURE_SERVICE_URL`, `REFEREE_SERVICE_URL` y `TEAM_SERVICE_URL`), de modo que las llamadas pasan por
+el cliente real (token interno, reintentos y circuit breaker).
+
+La cobertura se mide sobre todo `src/` salvo `main.ts` y las pruebas, incluido `src/chassis/`. El informe
+queda en `coverage/lcov-report/index.html` y el resumen en `coverage/coverage-summary.json`. En GitHub
+Actions se guarda como artefacto `coverage-live-score-service`.
+
+En el pipeline de CI también se ejecuta una prueba de carga con k6 (`load-tests/live-score.js` del
+repositorio principal) que simula varias jornadas a la vez.
 
 ## Endpoints principales
 

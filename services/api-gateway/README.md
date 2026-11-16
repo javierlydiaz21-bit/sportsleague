@@ -74,9 +74,10 @@ No usa Prisma ni PostgreSQL.
 ```
 api-gateway/
 ├── src/
-│   ├── main.ts               arranque y orden de los middlewares (puerto 4000)
+│   ├── main.ts               arranque (puerto 4000)
 │   ├── app.module.ts         módulo raíz (chassis sin el guard de servicio)
 │   ├── gateway/
+│   │   ├── setup.ts                  orden de los middlewares (seguridad, CORS, JWT, rate limiting y proxy)
 │   │   ├── routes.ts                 tabla de enrutamiento, rutas de ADMIN, rutas internas y niveles de rate limiting
 │   │   ├── auth.middleware.ts        validación del JWT, cabeceras de identidad y rechazo de orígenes
 │   │   ├── rate-limit.middleware.ts  rate limiting por ventana fija en Redis
@@ -85,7 +86,7 @@ api-gateway/
 │   │   ├── system.controller.ts      rutas /api/v1/system (panel del administrador)
 │   │   └── system.service.ts         salud agregada, eventos recientes y trazas
 │   └── chassis/              código común copiado del repositorio principal; no se edita aquí
-├── test/                     integración con un microservicio simulado (gateway.e2e.spec.ts)
+├── test/                     integración: middlewares con un microservicio simulado y el gateway completo (integration/)
 ├── Dockerfile                imagen multietapa (sin migraciones: no tiene base de datos)
 ├── .env.example              variables para ejecutar fuera de Docker
 ├── package.json              scripts (build, start:dev, lint, test…) y dependencias
@@ -177,16 +178,27 @@ curl http://localhost:4000/health
 
 ```bash
 npm ci
-npm run lint            # ESLint sobre src/ y test/
-npm test                # Jest: src/**/*.spec.ts (unitarias) y test/*.e2e.spec.ts (integración HTTP)
-npm run test:cov        # igual, con informe de cobertura en coverage/
+npm run lint               # ESLint sobre src/ y test/
+npm test                   # todas las pruebas (unitarias e integración)
+npm run test:unit          # unitarias: src/**/*.spec.ts
+npm run test:integration   # integración: test/**/*.spec.ts
+npm run test:cov           # todas, con el informe de cobertura
 ```
 
-Las pruebas no necesitan Redis ni los microservicios: usan un Redis falso y un microservicio simulado.
-Cubren la tabla de enrutamiento, las rutas internas bloqueadas y las de administrador, los niveles y el
-rechazo `429` del rate limiting (y que deja pasar si Redis no responde), el despertador, la propagación
-de identidad con el cuerpo intacto, la eliminación de cabeceras falsificadas y el bloqueo de usuarios
-suspendidos.
+Las pruebas no necesitan Redis ni los microservicios reales: usan un Redis en memoria y microservicios
+simulados por HTTP. El gateway no tiene base de datos.
+
+| Tipo | Archivo | Qué prueba | Qué se simula |
+|---|---|---|---|
+| Unitaria | `src/gateway/routes.spec.ts` | Tabla de enrutamiento, rutas internas bloqueadas, rutas de administrador y niveles de rate limiting | Nada (funciones puras) |
+| Unitaria | `src/gateway/rate-limit.middleware.spec.ts` | Rechazo `429` al superar el límite y paso libre si Redis no responde | El contador de Redis y la respuesta HTTP (dobles) |
+| Unitaria | `src/gateway/wake.spec.ts` | El despertador de Render Free consulta cada `/health` como mucho una vez por intervalo y no retrasa la petición | La consulta a los servicios (`jest.fn()`) |
+| Integración HTTP | `test/gateway.e2e.spec.ts` | Middlewares de autenticación, rate limiting y proxy frente a un microservicio simulado: identidad, cuerpo intacto, cabeceras falsificadas, rutas de administración e internas y usuarios suspendidos | Un microservicio (servidor HTTP local) y Redis |
+| Integración del gateway completo | `test/integration/gateway.integration.spec.ts` | La aplicación tal como arranca en producción (`configureApp` + `configureGateway`): enrutamiento a cada servicio con el token interno y el mismo `x-request-id`, JWT válido, falsificado y vencido, 401, 403 y 404, CORS (origen ajeno y preflight), `429` al cuarto inicio de sesión, `503` con un servicio apagado, estado agregado para el administrador y `/metrics` | Los microservicios (un servidor HTTP local por servicio, Analytics apagado) y Redis (en memoria) |
+
+La cobertura se mide sobre todo `src/` salvo `main.ts` y las pruebas, incluido `src/chassis/`. El informe
+queda en `coverage/lcov-report/index.html` y el resumen en `coverage/coverage-summary.json`. En GitHub
+Actions se guarda como artefacto `coverage-api-gateway`.
 
 ## Endpoints principales
 

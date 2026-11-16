@@ -292,7 +292,7 @@ function summary() {
 ────────────────────────────────────────────────────────────
   Datos de demostración listos  →  http://localhost:3000
 
-  Administrador   ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}
+  Administrador   ${ADMIN_EMAIL} / ${process.env.ADMIN_PASSWORD ? '(la de ADMIN_PASSWORD, no se muestra)' : ADMIN_PASSWORD}
   Organizador     organizador@demo.com / ${PASSWORD}
   Organizadora 2  organizadora@demo.com / ${PASSWORD}   (ligas pendientes)
   Árbitro         arbitro@demo.com / ${PASSWORD}

@@ -48,7 +48,10 @@ microservicios independientes. El README.md documenta todo; aquí van solo la es
   `render.yaml` (de pago) queda como referencia. No propongas servicios de pago.
   Producción: web https://sportsleague-cyan.vercel.app, gateway
   https://sportsleague-jd-gateway.onrender.com, WebSocket https://sportsleague-jd-live.onrender.com.
-  La PostgreSQL gratuita (`sportsleague-jd-db`) se creó el 13/10/2026 y caduca a los 30 días.
+  La PostgreSQL gratuita (`sportsleague-jd-db`) se recreó el 16/11/2026 (la primera venció el
+  13/11) y caduca el 16/12/2026. Cómo recrearla: README, «Despliegue gratuito».
+  El administrador de producción no usa `Admin12345`: su contraseña está en `ADMIN_PASSWORD` de
+  Render y en la variable de usuario de Windows `SPORTSLEAGUE_ADMIN_PASSWORD`; nunca la imprimas.
 
 ## Arrancar y verificar
 
