@@ -288,6 +288,8 @@ Para propagar una mejora: `node scripts/sync-chassis.mjs`.
   difunde por WebSocket), `live_viewers_total`, `standings_recalculations_total`,
   `referee_assignments_total`, `circuit_breaker_state`, `gateway_rate_limit_rejections_total`.
 - **Grafana**: dashboard "SportsLeague — Jornada en vivo" con filtros por liga, temporada y categoría.
+  Por microservicio muestra disponibilidad (ARRIBA/CAÍDO), peticiones por segundo, tiempo de
+  respuesta p95 y tasa de errores 5xx (en %).
 - **Alertas** (`infra/prometheus/alerts.yml`): servicio caído, tasa de errores, latencia del
   gateway, latencia del marcador en vivo, CPU alta en Live Score, circuito abierto.
 - **Health checks**: `/health` (base de datos + Redis; Render lo usa para los rolling updates) y
