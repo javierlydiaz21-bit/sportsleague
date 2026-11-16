@@ -175,15 +175,35 @@ curl -X POST http://localhost:4009/api/v1/analytics/etl/run \
 
 ```bash
 npm ci
-npx prisma generate     # genera los tipos del cliente de Prisma
-npm run lint            # ESLint sobre src/ y test/
-npm test                # Jest: src/**/*.spec.ts (unitarias) y test/*.e2e.spec.ts (integración HTTP)
-npm run test:cov        # igual, con informe de cobertura en coverage/
+npx prisma generate        # genera los tipos del cliente de Prisma
+npm run lint               # ESLint sobre src/ y test/
+npm test                   # todas las pruebas (unitarias e integración)
+npm run test:unit          # unitarias: src/**/*.spec.ts
+npm run test:integration   # integración: test/**/*.spec.ts
+npm run test:cov           # todas, con el informe de cobertura
 ```
 
-Las pruebas no necesitan PostgreSQL ni Redis: usan dobles en memoria y desactivan el ETL programado
-(`ETL_DISABLED=true`). Cubren la resolución de las URL de las réplicas, las transformaciones (asistencia
-con acta o pico en línea, suspendidos, KPIs, tendencia acumulada) y los permisos de las consultas.
+Las pruebas desactivan el ETL programado (`ETL_DISABLED=true`) y lo ejecutan a mano.
+
+| Tipo | Archivo | Qué prueba | Qué se simula |
+|---|---|---|---|
+| Unitaria | `src/etl/transform.spec.ts` | Transformaciones: asistencia con acta o pico en línea, suspendidos, KPIs y tendencia acumulada | Nada (funciones puras) |
+| Unitaria | `src/etl/replica-url.spec.ts` | Resolución de las URL de las réplicas | Nada (funciones puras) |
+| Unitaria | `src/etl/etl.service.spec.ts` | Corrida completa en una transacción (`SUCCESS`), réplica caída (`FAILED` sin tocar las tablas) y candado de Redis entre instancias | Las réplicas (`pg.Pool`), Prisma y Redis (`jest.fn()`) |
+| Integración HTTP | `test/analytics.e2e.spec.ts` | Resumen global solo para `ADMIN` y analítica de liga solo para su organizador | Prisma, Redis y el bus de eventos |
+| Integración con PostgreSQL | `test/integration/analytics.integration.spec.ts` | ETL real sobre tres réplicas (esquemas con las tablas que lee y datos conocidos) conectadas en solo lectura → KPIs, asistencia estimada, suspendidos y tendencia por HTTP; segunda corrida sin duplicar; réplica rota (`FAILED`, se conserva la analítica anterior); 403 de otro organizador y de un aficionado; `/metrics` | Solo Redis (candado del ETL) |
+
+La prueba de integración con PostgreSQL usa `TEST_DATABASE_URL`. Por defecto es la PostgreSQL de Docker
+Compose del repositorio principal (`docker compose up -d postgres`):
+`postgresql://postgres:postgres@localhost:5440/analytics_db?schema=pruebas`. Crea un esquema propio por ejecución (`pruebas_<sufijo aleatorio>`) con
+las migraciones y, para las réplicas, ese nombre con `_fixture`, `_livescore` y `_statistics`, a las
+que el ETL se conecta con `default_transaction_read_only=on`. Los borra al terminar y se niega a
+ejecutarse si la URL no indica un esquema propio, para no tocar los datos de desarrollo. En GitHub Actions
+corre contra un contenedor `postgres:16-alpine`.
+
+La cobertura se mide sobre todo `src/` salvo `main.ts` y las pruebas, incluido `src/chassis/`. El informe
+queda en `coverage/lcov-report/index.html` y el resumen en `coverage/coverage-summary.json`. En GitHub
+Actions se guarda como artefacto `coverage-analytics-service`.
 
 ## Endpoints principales
 

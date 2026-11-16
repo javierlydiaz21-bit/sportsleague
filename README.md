@@ -46,6 +46,9 @@ docker compose --profile demo run --rm seed   # liga de demostración (equivale 
 | Árbitro | `arbitro@demo.com` | `Demo12345` |
 | Aficionado | `aficionado@demo.com` | `Demo12345` |
 
+Esas contraseñas son las del entorno local. En producción (Render), el administrador usa la de
+`ADMIN_PASSWORD`, que no es pública.
+
 | URL | Qué es |
 |---|---|
 | http://localhost:3000 | Web (pública, panel de organizador/árbitro y administración) |
@@ -490,7 +493,14 @@ Límites del plan gratuito:
   eventos de Redis; si falta algo en la tabla, usa *Recalcular*.
 - 750 horas de instancia al mes para todo el workspace (10 servicios despiertos gastan 10 h por hora).
 - La PostgreSQL gratuita **caduca a los 30 días** y se borra 14 días después: crea el blueprint
-  pocos días antes de la presentación.
+  pocos días antes de la presentación. Si ya venció (los servicios con base responden con error y
+  Render la muestra como *suspended*), sus datos no se recuperan en el plan gratuito:
+  1. Borra la base vencida (`sportsleague-jd-db`): Render permite una sola PostgreSQL gratuita.
+  2. Render → *Blueprints* → `sportsleague` → *Manual Sync* → *Approve*. Crea la base con el mismo
+     nombre, actualiza `DATABASE_URL` en los 9 servicios y los redespliega.
+  3. Comprueba el `/health` de los 10 y vuelve a cargar la demo:
+     `API_URL=https://sportsleague-jd-gateway.onrender.com ADMIN_PASSWORD=<la de Render> node scripts/seed-demo.mjs`.
+     Las cuentas creadas a mano se pierden; el administrador se crea con `ADMIN_PASSWORD`.
 - En Safari, la sesión no sobrevive a una recarga de la página: bloquea la cookie de sesión
   (otro dominio, `onrender.com`) y hay que volver a iniciar sesión.
 - Render Free **bloquea los puertos SMTP** (25, 465 y 587) desde septiembre de 2025: por eso el

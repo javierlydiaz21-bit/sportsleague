@@ -197,16 +197,53 @@ Las cuentas gratuitas de Gmail permiten unos 100 correos al día con este métod
 
 ```bash
 npm ci
-npx prisma generate     # genera los tipos del cliente de Prisma
-npm run lint            # ESLint sobre src/ y test/
-npm test                # Jest: src/**/*.spec.ts (unitarias) y test/*.e2e.spec.ts (integración HTTP)
-npm run test:cov        # igual, con informe de cobertura en coverage/
+npx prisma generate        # genera los tipos del cliente de Prisma
+npm run lint               # ESLint sobre src/ y test/
+npm test                   # todas las pruebas (unitarias e integración)
+npm run test:unit          # unitarias: src/**/*.spec.ts
+npm run test:integration   # integración: test/**/*.spec.ts
+npm run test:cov           # todas, con el informe de cobertura
 ```
 
-Las pruebas no necesitan PostgreSQL, Redis ni Gmail: usan dobles en memoria y simulan el Apps Script.
-Cubren el envío con la clave compartida, los estados `FAILED` y `SIMULATED`, la idempotencia con eventos
-repetidos, los destinatarios (organizador y aficionados), las plantillas (zona horaria, cambio de sede u
-horario, resultado final o corregido) y los permisos de la bandeja.
+`npm test` no envía correos ni avisos push reales. La única excepción es la prueba opcional de correo
+real, que se omite si no se le dan los datos del relé (ver más abajo).
+
+| Tipo | Archivo | Qué prueba | Qué se simula |
+|---|---|---|---|
+| Unitaria | `src/notifications/templates.spec.ts` | Plantillas: aprobación de liga, jornada, zona horaria, cambio de sede u horario y resultado final o corregido | Nada (funciones puras) |
+| Unitaria | `src/notifications/mailer.spec.ts` | Envío con la clave compartida y estados `FAILED` y `SIMULATED` | El Apps Script (`fetch` simulado) |
+| Unitaria | `src/notifications/push.spec.ts` | Aviso cifrado a cada navegador, suscripciones caducadas (410), `SIMULATED` sin claves VAPID y alta por endpoint | `web-push` y Prisma (`jest.fn()`) |
+| Unitaria | `src/notifications/notifications.service.spec.ts` | Destinatarios (administradores, organizador y aficionados), idempotencia, correo y push por destinatario y preferencias | Prisma, el bus de eventos, el correo y el push (`jest.fn()`) |
+| Integración HTTP | `test/notifications.e2e.spec.ts` | Bandeja con no leídas, permisos sobre la bandeja ajena y registro de envíos solo para `ADMIN` | Prisma, Redis y el bus de eventos |
+| Integración con PostgreSQL | `test/integration/notification.integration.spec.ts` | Seguir la liga, preferencias y navegador para push → `league.created` (aviso por rol) → `match.completed` (avisos al organizador y aficionados, correo por el relé solo a quien lo tiene activo) → mismo mensaje entregado dos veces sin duplicar → relé caído (`FAILED`, el aviso llega igual) → bandeja y lectura; 400, 403 y 404; `/metrics` | Relé de correo con el contrato del Apps Script y Team Service (servidor HTTP local), Redis y Web Push (`SIMULATED`) |
+
+La prueba de integración con PostgreSQL usa `TEST_DATABASE_URL`. Por defecto es la PostgreSQL de Docker
+Compose del repositorio principal (`docker compose up -d postgres`):
+`postgresql://postgres:postgres@localhost:5440/notification_db?schema=pruebas`. Crea un esquema propio por ejecución (`pruebas_<sufijo aleatorio>`)
+con las migraciones, lo borra al terminar y se niega a ejecutarse si la URL no indica un esquema propio,
+para no tocar los datos de desarrollo. En GitHub Actions corre contra un contenedor `postgres:16-alpine`.
+El relé de correo y Team Service se simulan con un servidor HTTP en un puerto libre (`MAIL_RELAY_URL` con
+una clave de prueba y `TEAM_SERVICE_URL`).
+
+**Correo real (opcional).** `test/integration/real-mail.integration.spec.ts` envía un correo de verdad por
+Gmail a través del Apps Script y comprueba que el resultado es `SENT`. Solo corre si se definen
+`MAIL_RELAY_URL`, `MAIL_RELAY_SECRET` y `CORREO_REAL_PARA` (la dirección que lo recibe). Si falta alguna,
+se omite; así ocurre en GitHub Actions, para que el CI no mande un correo en cada push ni necesite la
+clave del relé. En PowerShell:
+
+```powershell
+$env:MAIL_RELAY_URL = 'https://script.google.com/macros/s/<id>/exec'
+$env:MAIL_RELAY_SECRET = '<la clave SECRETO del script>'
+$env:CORREO_REAL_PARA = 'tu-correo@gmail.com'
+npx jest real-mail
+```
+
+No uses una dirección de `MAIL_SKIP_DOMAINS` (`@demo.com`, `@example.com`, `@sportsleague.com`): a esas
+nunca se envía.
+
+La cobertura se mide sobre todo `src/` salvo `main.ts` y las pruebas, incluido `src/chassis/`. El informe
+queda en `coverage/lcov-report/index.html` y el resumen en `coverage/coverage-summary.json`. En GitHub
+Actions se guarda como artefacto `coverage-notification-service`.
 
 ## Endpoints principales
 

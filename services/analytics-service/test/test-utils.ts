@@ -1,6 +1,7 @@
 import { INestApplication, Type } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
-import { AllExceptionsFilter, EventBus, InMemoryEventBus, RedisService, createValidationPipe } from '../src/chassis';
+import { EventBus, InMemoryEventBus, RedisService, configureApp } from '../src/chassis';
 
 export const INTERNAL_TOKEN = 'test-internal-token';
 process.env.INTERNAL_API_TOKEN = INTERNAL_TOKEN;
@@ -68,10 +69,9 @@ export async function createTestApp(
     .useValue(bus);
   if (configure) builder = configure(builder);
   const moduleRef = await builder.compile();
-  const app = moduleRef.createNestApplication({ logger: false });
-  app.setGlobalPrefix('api/v1', { exclude: ['health', 'status', 'metrics'] });
-  app.useGlobalPipes(createValidationPipe());
-  app.useGlobalFilters(new AllExceptionsFilter());
+  // Misma configuración que producción (configureApp): métricas, prefijo, validación y errores.
+  const app = moduleRef.createNestApplication<NestExpressApplication>({ logger: false, bodyParser: false });
+  configureApp(app);
   await app.init();
   return { app, bus };
 }

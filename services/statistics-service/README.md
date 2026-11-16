@@ -170,16 +170,33 @@ curl http://localhost:4007/api/v1/standings/<uuid-de-la-temporada> -H "x-interna
 
 ```bash
 npm ci
-npx prisma generate     # genera los tipos del cliente de Prisma
-npm run lint            # ESLint sobre src/ y test/
-npm test                # Jest: src/**/*.spec.ts (unitarias) y test/*.e2e.spec.ts (integración HTTP)
-npm run test:cov        # igual, con informe de cobertura en coverage/
+npx prisma generate        # genera los tipos del cliente de Prisma
+npm run lint               # ESLint sobre src/ y test/
+npm test                   # todas las pruebas (unitarias e integración)
+npm run test:unit          # unitarias: src/**/*.spec.ts
+npm run test:integration   # integración: test/**/*.spec.ts
+npm run test:cov           # todas, con el informe de cobertura
 ```
 
-Las pruebas no necesitan PostgreSQL, Redis ni los otros servicios: usan dobles en memoria. Cubren los
-puntos por reglamento (incluido el de básquet), los desempates (diferencia de gol, goles a favor,
-enfrentamiento directo y triple empate circular), la idempotencia, las correcciones del acta con
-versiones antiguas ignoradas, el reglamento estándar cuando League no responde y la caché de la tabla.
+| Tipo | Archivo | Qué prueba | Qué se simula |
+|---|---|---|---|
+| Unitaria | `src/statistics/calculator.spec.ts` | Puntos por reglamento (incluido el de básquet), desempates (diferencia de gol, goles a favor, enfrentamiento directo y triple empate circular), goleadores y tarjetas | Nada (funciones puras) |
+| Unitaria | `src/statistics/statistics.service.spec.ts` | Recálculo con `match.completed` y aviso `standings.updated`, idempotencia, correcciones del acta con versiones antiguas ignoradas y reglamento estándar si League no responde | Prisma, la caché, el bus de eventos y los clientes de los otros servicios (`jest.fn()`) |
+| Integración HTTP | `test/statistics.e2e.spec.ts` | Tabla pública servida desde la caché y recálculo manual con sesión | Prisma, Redis y el bus de eventos |
+| Integración con PostgreSQL | `test/integration/statistics.integration.spec.ts` | `fixture.published` → tabla en cero → `match.completed` → tabla, goleadores y tarjetas por HTTP (la segunda consulta sale de la caché); acta repetida, corrección y versión vieja ignorada; recálculo con conciliación que recupera un acta perdida del Live Score Service; 403 de otro organizador y 400 con una temporada inválida; `/metrics` | League y Live Score Service (servidor HTTP local) y Redis |
+
+La prueba de integración con PostgreSQL usa `TEST_DATABASE_URL`. Por defecto es la PostgreSQL de Docker
+Compose del repositorio principal (`docker compose up -d postgres`):
+`postgresql://postgres:postgres@localhost:5440/statistics_db?schema=pruebas`. Crea un esquema propio por ejecución (`pruebas_<sufijo aleatorio>`)
+con las migraciones, lo borra al terminar y se niega a ejecutarse si la URL no indica un esquema propio,
+para no tocar los datos de desarrollo. En GitHub Actions corre contra un contenedor `postgres:16-alpine`.
+League y Live Score Service se simulan con un servidor HTTP en un puerto libre (`LEAGUE_SERVICE_URL` y
+`LIVE_SCORE_SERVICE_URL`), de modo que las llamadas pasan por el cliente real (token interno, reintentos
+y circuit breaker).
+
+La cobertura se mide sobre todo `src/` salvo `main.ts` y las pruebas, incluido `src/chassis/`. El informe
+queda en `coverage/lcov-report/index.html` y el resumen en `coverage/coverage-summary.json`. En GitHub
+Actions se guarda como artefacto `coverage-statistics-service`.
 
 ## Endpoints principales
 

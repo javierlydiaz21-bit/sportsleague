@@ -167,15 +167,30 @@ curl http://localhost:4002/api/v1/leagues -H "x-internal-token: dev-internal-tok
 
 ```bash
 npm ci
-npx prisma generate     # genera los tipos del cliente de Prisma
-npm run lint            # ESLint sobre src/ y test/
-npm test                # Jest: src/**/*.spec.ts (unitarias) y test/*.e2e.spec.ts (integración HTTP)
-npm run test:cov        # igual, con informe de cobertura en coverage/
+npx prisma generate        # genera los tipos del cliente de Prisma
+npm run lint               # ESLint sobre src/ y test/
+npm test                   # todas las pruebas (unitarias e integración)
+npm run test:unit          # unitarias: src/**/*.spec.ts
+npm run test:integration   # integración: test/**/*.spec.ts
+npm run test:cov           # todas, con el informe de cobertura
 ```
 
-Las pruebas no necesitan PostgreSQL ni Redis: sustituyen Prisma, Redis y el bus de eventos por dobles en
-memoria. Cubren el ciclo de aprobación de ligas, la visibilidad de las ligas pendientes, los reglamentos
-por defecto, la validación de edades, fechas y horas, y los permisos del organizador.
+| Tipo | Archivo | Qué prueba | Qué se simula |
+|---|---|---|---|
+| Unitaria | `src/leagues/leagues.service.spec.ts` | Ciclo de aprobación de ligas, visibilidad de las pendientes, permisos del organizador y validación de edades y fechas | Prisma y el bus de eventos (`jest.fn()`) |
+| Unitaria | `src/leagues/rules.spec.ts` | Reglamentos por defecto de cada deporte, transiciones de revisión y validación de horas y fechas | Nada (funciones puras) |
+| Integración HTTP | `test/leagues.e2e.spec.ts` | Rutas, sesión, roles y validación de los DTO | Prisma, Redis y el bus de eventos |
+| Integración con PostgreSQL | `test/integration/league.integration.spec.ts` | Crear liga → temporada → `GET /leagues/:id`; 401 sin token interno, 400 con fechas inválidas y 403 de otro organizador, comprobando la base; `/metrics` | Solo Redis (bus de eventos en memoria) |
+
+La prueba de integración con PostgreSQL usa `TEST_DATABASE_URL`. Por defecto es la PostgreSQL de Docker
+Compose del repositorio principal (`docker compose up -d postgres`):
+`postgresql://postgres:postgres@localhost:5440/league_db?schema=pruebas`. Crea un esquema propio por ejecución (`pruebas_<sufijo aleatorio>`) con las
+migraciones, lo borra al terminar y se niega a ejecutarse si la URL no indica un esquema propio, para no
+tocar los datos de desarrollo. En GitHub Actions corre contra un contenedor `postgres:16-alpine`.
+
+La cobertura se mide sobre todo `src/` salvo `main.ts` y las pruebas, incluido `src/chassis/`. El informe
+queda en `coverage/lcov-report/index.html` y el resumen en `coverage/coverage-summary.json`. En GitHub
+Actions se guarda como artefacto `coverage-league-service`.
 
 ## Endpoints principales
 
