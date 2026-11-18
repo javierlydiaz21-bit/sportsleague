@@ -330,7 +330,9 @@ detener.bat              detiene los contenedores conservando los datos
 
 ## Pruebas
 
-Cada servicio tiene pruebas unitarias e integración HTTP con Jest (155 pruebas en total), por ejemplo:
+Cada servicio tiene pruebas unitarias y de integración (HTTP y contra PostgreSQL real) con Jest:
+256 en total. El detalle por servicio, con la cobertura, está en
+[EVIDENCIAS_PRUEBAS.md](EVIDENCIAS_PRUEBAS.md). Por ejemplo:
 
 - Fixture: propiedades del round-robin (cada par se enfrenta una vez, localía equilibrada ±1,
   nadie juega dos veces por jornada) y del calendario (descanso mínimo, canchas y horarios).
