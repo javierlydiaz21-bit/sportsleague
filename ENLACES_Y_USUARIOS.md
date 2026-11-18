@@ -13,6 +13,18 @@ Enlaces de la plataforma desplegada, documentación de la API, repositorios y cu
 | API Gateway (único punto de entrada HTTP; las rutas van bajo `/api/v1`) | https://sportsleague-jd-gateway.onrender.com |
 | Marcador en vivo (WebSocket, Socket.IO, namespace `/live`) | https://sportsleague-jd-live.onrender.com |
 
+## Monitoreo en producción
+
+| Qué | Enlace |
+|---|---|
+| Dashboard público de Grafana Cloud, «SportsLeague — Jornada en vivo (público)» | https://jademantel3442.grafana.net/public-dashboards/104a3d4644dd4bfaac49d671212d5e66 |
+
+> **Los datos se recogen solo en ventanas.** Grafana Cloud lee el `/metrics` de cada microservicio
+> en Render, y cada lectura despierta al servicio. El plan gratuito de Render da 750 horas de
+> ejecución al mes para todos los servicios del espacio de trabajo, así que la recolección se
+> enciende solo para las capturas y la sustentación, y se apaga después. Fuera de esas ventanas, el
+> dashboard no muestra datos recientes.
+
 ## Estado de los microservicios
 
 Cada servicio expone `GET /health`. Responde `200` con el estado de su base de datos y de Redis
@@ -103,4 +115,5 @@ de demostración. El administrador local entra con `admin@sportsleague.com` / `A
 | http://localhost:3100 | Grafana (`admin` / `admin`), dashboard «SportsLeague — Jornada en vivo» |
 | http://localhost:9090 | Prometheus (métricas y alertas) |
 
-Grafana y Prometheus solo se ejecutan en local: el despliegue gratuito de Render no los incluye.
+Este Prometheus y este Grafana solo se ejecutan en local. En producción, las métricas las recoge
+Grafana Cloud (ver «Monitoreo en producción»).
