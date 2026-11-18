@@ -222,6 +222,8 @@ solo entre servicios (el gateway responde `404` a `/api/v1/internal/*`).
 | GET | `/health` | Abierto | Salud del servicio (base de datos y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria, checks y canales suscritos; lo consulta el panel *Sistema* del gateway. |
 | GET | `/metrics` | Abierto | Métricas Prometheus, incluida `referee_assignments_total` (por resultado y modo automático o manual). |
+| GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
+| GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
 ## Eventos
 

@@ -212,12 +212,15 @@ middleware del gateway).
 | GET | `/health` | Abierto | Salud del gateway (Redis). `200` o `503`. |
 | GET | `/status` | Rol `ADMIN` | Versión, tiempo activo, memoria y checks del gateway. |
 | GET | `/metrics` | Abierto | Métricas Prometheus (HTTP, solicitudes y latencia por servicio destino, rechazos por rate limiting). |
+| GET | `/docs` | Abierto | Documentación de la API del gateway (Swagger UI, generada con `@nestjs/swagger`). Con «Authorize» y el `accessToken` de un administrador se prueban las rutas de `/api/v1/system`. |
+| GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 | GET | `/api/v1/system/health` | Rol `ADMIN` | Salud agregada: consulta `/status` de los 9 servicios (con el token interno y timeout de 2,5 s), Redis y el número de suscriptores de cada canal de eventos (`PUBSUB NUMSUB`). Estado general `ok`, `degraded` o `down`. |
 | GET | `/api/v1/system/events` | Rol `ADMIN` | Últimos eventos del bus (lista `events:recent` de Redis); `limit` de 1 a 200, por defecto 50. |
 | GET | `/api/v1/system/traces` | Rol `ADMIN` | Partidos con trazas recientes y su última actividad; `limit` de 1 a 200, por defecto 30. |
 | GET | `/api/v1/system/traces/:matchId` | Rol `ADMIN` | Recorrido completo de un partido por todos los servicios (Redis Stream `trace:match:<id>`). |
 
-`/health`, `/status` y `/metrics` no llevan el prefijo `/api/v1` (ver `src/chassis/bootstrap.ts`).
+`/health`, `/status`, `/metrics`, `/docs` y `/openapi.json` no llevan el prefijo `/api/v1` (ver
+`src/chassis/bootstrap.ts` y `src/chassis/openapi.ts`).
 
 ### Tabla de enrutamiento
 

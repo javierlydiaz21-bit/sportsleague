@@ -26,6 +26,7 @@
     "@nestjs/core": "^11.2.7",
     "@nestjs/platform-express": "^11.2.7",
     "@nestjs/platform-socket.io": "^11.2.7",
+    "@nestjs/swagger": "^11.4.8",
     "@nestjs/websockets": "^11.2.7",
     "@prisma/client": "^6.19.3",
     "class-transformer": "^0.5.1",
@@ -88,5 +89,8 @@
         "lines": 50
       }
     }
+  },
+  "scarfSettings": {
+    "enabled": false
   }
 }

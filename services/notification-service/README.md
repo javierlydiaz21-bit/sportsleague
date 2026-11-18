@@ -274,6 +274,8 @@ entre paréntesis, la comprobación adicional del servicio. *Rol* = solo esos ro
 | GET | `/health` | Abierto | Salud del servicio (base de datos y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria, checks, circuitos (Team) y canales suscritos; lo consulta el panel *Sistema* del gateway. |
 | GET | `/metrics` | Abierto | Métricas Prometheus, incluidas `notifications_created_total{type}` y `notification_deliveries_total{channel,status}`. |
+| GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
+| GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
 En el gateway, `/api/v1/notifications/deliveries` también está restringida a `ADMIN`.
 

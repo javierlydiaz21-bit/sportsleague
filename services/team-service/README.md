@@ -223,6 +223,8 @@ esos roles (`@Roles`).
 | GET | `/health` | Abierto | Salud del servicio (base de datos y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria, checks, circuitos (incluido el del League Service) y suscripciones; lo consulta el panel *Sistema* del gateway. |
 | GET | `/metrics` | Abierto | Métricas Prometheus (HTTP, llamadas al League Service y estado de su circuit breaker). |
+| GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
+| GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
 La ruta `/api/v1/players/:id/disciplinary-record` no llega a este servicio: el gateway la envía al
 Statistics Service.

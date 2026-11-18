@@ -218,6 +218,8 @@ Se consumen a través del API Gateway (`http://localhost:4000`). Todas las rutas
 | GET | `/health` | Abierto | Salud del servicio (base de datos y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria, checks, circuitos y suscripciones; lo consulta el panel *Sistema* del gateway. |
 | GET | `/metrics` | Abierto | Métricas Prometheus (HTTP, eventos publicados y consumidos). |
+| GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
+| GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
 En el gateway, las rutas `/api/v1/users/*` también están restringidas a `ADMIN`, y `login`, `register`
 y `refresh` tienen el límite más estricto de rate limiting (20 por minuto e IP).
