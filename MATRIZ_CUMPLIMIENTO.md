@@ -40,11 +40,8 @@ El detalle está en [EVIDENCIAS_PRUEBAS.md](EVIDENCIAS_PRUEBAS.md).
 | Notification | 8 | 8 | 100 % | Correo real (Gmail vía Google Apps Script), push del navegador (Web Push con VAPID), consumidor de 9 eventos |
 | Analytics | 4 | 4 (1 con desviación justificada) | 100 % | ETL periódico de solo consultas sobre las bases de Fixture, Live Score y Statistics (en local, con un usuario de solo lectura), KPIs |
 | Auth | 6 | 6 | 100 % | JWT, refresh tokens rotativos, bcrypt, CSRF, roles |
-| API Gateway | 7 | 6 | 86 % | Proxy inverso, JWT, rate limiting en Redis, CORS, trazas por `match_id` |
-| **Total** | **66** | **65** | **98,5 %** | — |
-
-El único requerimiento sin cumplir es **GW-04**. El gateway registra cada petición, pero no guarda la
-IP del cliente.
+| API Gateway | 7 | 7 | 100 % | Proxy inverso, JWT, rate limiting en Redis, CORS, logs con IP del cliente, trazas por `match_id` |
+| **Total** | **66** | **66** | **100 %** | — |
 
 **ANA-01** cuenta como cumplido con una desviación justificada: en producción no hay réplicas de solo
 lectura. La explicación está en la sección de Analytics.
@@ -207,7 +204,7 @@ Momento 1, §5 y §10.7; Momento 2.
 | GW-01 | Punto de entrada único que enruta cada petición al microservicio correcto según el path (§5, §5.1) | Tabla de enrutamiento de `/api/v1/*` | Integración: «enruta cada lectura pública a su microservicio con el token interno y el mismo x-request-id»; `routes.spec.ts` | Cumplido |
 | GW-02 | Validar firma y expiración del JWT y responder `401` sin llegar a los servicios (§5.1, §5.2) | Middleware de autenticación | Integración: «…sin sesión responde 401 sin llegar al servicio»; «…rechaza tokens falsificados o vencidos» | Cumplido |
 | GW-03 | Rate limiting por cliente o IP, más estricto en escritura (§5.1, §5.3) | Niveles `auth`, `write` y `read` en Redis | Integración: «rate limiting: el cuarto intento de inicio de sesión en la ventana responde 429 con Retry-After»; `routes.spec.ts`: «clasifica el nivel de rate limiting» | Cumplido |
-| GW-04 | Registrar en cada petición la IP del cliente, fecha y hora, endpoint, método, usuario, código y tiempo de respuesta (§5.1, §5.3) | El log `http_request` registra fecha y hora, método, ruta, código, duración, usuario y `matchId`. **No registra la IP del cliente**: solo se usa como clave del rate limiting | — | **No cumplido** |
+| GW-04 | Registrar en cada petición la IP del cliente, fecha y hora, endpoint, método, usuario, código y tiempo de respuesta (§5.1, §5.3) | El log `http_request` registra fecha y hora, IP del cliente (`TRUST_PROXY=1` en Render, para que sea la del cliente y no la del proxy), método, ruta, código, duración, usuario y `matchId` | Unitaria (`http-observability.spec.ts`, en los 10 servicios): «registra la IP del cliente, el método, la ruta, el código, la duración y el x-request-id» | Cumplido |
 | GW-05 | CORS solo para los dominios autorizados (§10.7) | `CORS_ORIGINS`; responde `403` a otros orígenes | Integración: «CORS: rechaza orígenes no permitidos y responde el preflight del origen de la web» | Cumplido |
 | GW-06 | Permisos diferenciados (§5.2) | Rutas de administración solo para `ADMIN`, rutas internas bloqueadas y usuarios suspendidos rechazados | Integración: «bloquea rutas internas (404), las de administración a quien no es ADMIN (403) y a un usuario suspendido (403)» | Cumplido |
 | GW-07 | Logs con `match_id` (Momento 2; §9.1) | `matchId` en los logs; traza por partido en `GET /api/v1/system/traces/:matchId`; pantalla *Administración → Trazabilidad* | — | Cumplido |
