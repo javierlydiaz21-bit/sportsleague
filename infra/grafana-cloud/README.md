@@ -11,4 +11,10 @@ stack de Grafana Cloud. Tiene los mismos 16 paneles, con dos cambios:
 
 Si cambia el dashboard local, hay que regenerar este archivo con esas dos sustituciones.
 
+`sportsleague-publico.json` es la versión para compartir con un enlace externo (uid
+`sportsleague-publico`), porque Grafana no admite variables de plantilla en los dashboards públicos.
+Tiene los mismos 16 paneles y no tiene variables: los paneles de eventos de partido quitan el filtro
+`{league_id=~"$league", season_id=~"$season", category_id=~"$category"}` y muestran todas las ligas,
+temporadas y categorías. El dashboard con filtros (`sportsleague.json`) no cambia.
+
 Para importarlo a mano: Grafana → *Dashboards* → *New* → *Import* → subir `sportsleague.json`.
