@@ -1,24 +1,24 @@
 # Evidencias de pruebas · SportsLeague
 
 Cada uno de los 10 microservicios tiene pruebas unitarias con dobles de Jest (`jest.fn()`,
-`jest.mock()`) y una prueba de integración. Los datos salen del CI de GitHub Actions del 16/11/2026,
-sobre el código de `main` (commit `514f920` del repositorio principal, sincronizado a cada repositorio
-de servicio).
+`jest.mock()`) y una prueba de integración. Los datos salen del CI de GitHub Actions del 18/11/2026
+en el repositorio principal, sobre la rama `develop` (commit `99243a2`): el código del release, que
+luego se sincroniza a cada repositorio de servicio.
 
 ## Resumen por microservicio
 
 | Microservicio | Prueba unitaria 1 | Prueba unitaria 2 | Prueba de integración | Cobertura con chassis | Cobertura sin chassis |
 |---|---|---|---|---|---|
-| api-gateway | «consulta el /health de todos los servicios como mucho una vez por intervalo» | «no retrasa ni rompe la petición si un servicio no responde» | `gateway.integration.spec.ts`: la cadena completa del gateway frente a los 9 servicios simulados por HTTP (enrutamiento, JWT, roles, CORS, rate limiting con 429, 503 y `/metrics`) | 54,25 % | 88,52 % |
-| auth-service | «suspender a un usuario revoca sus sesiones, lo marca en Redis para el gateway y publica user.updated» | «el administrador no puede cambiar su propio rol o estado» | `auth.integration.spec.ts`: registro, inicio de sesión, rotación del refresh token con CSRF, detección de reutilización y suspensión por el administrador, sobre PostgreSQL | 62,00 % | 84,10 % |
-| league-service | «crea la liga pendiente de aprobación y avisa con league.created» | «el administrador aprueba la liga y se publica league.reviewed» | `league.integration.spec.ts`: crea una liga y su temporada en PostgreSQL y las lee por HTTP; 401 sin token interno, 400 con fechas inválidas y 403 a otro organizador | 56,42 % | 69,46 % |
-| team-service | «valida la elegibilidad automáticamente al fichar un jugador» | «deja al jugador pendiente cuando no se puede consultar la categoría» | `team.integration.spec.ts`: registra un equipo con los datos de League Service, ficha jugadores y calcula su elegibilidad; 404, 409 y 400; con League Service caído usa la caché | 65,52 % | 70,59 % |
-| fixture-service | «genera el calendario completo de la categoría en borrador» | «actualiza el estado del partido de forma idempotente al recibir match.completed» | `fixture.integration.spec.ts`: genera el calendario en borrador, lo publica (un `fixture.published` por jornada), reprograma un partido y sigue `match.started` y `match.completed` | 69,95 % | 84,42 % |
-| referee-service | «asigna automáticamente al árbitro de la misma zona y publica referee.assigned» | «avisa con referee.unassigned cuando nadie está disponible» | `referee.integration.spec.ts`: registra árbitros, los asigna por zona al recibir `fixture.published` sin duplicar, avisa si nadie está disponible y busca reemplazo cuando el árbitro rechaza | 57,19 % | 68,86 % |
-| live-score-service | «el árbitro asignado registra un gol, se calcula el marcador y se publica match.event» | «al finalizar publica el acta (match.completed) con el marcador y la versión» | `live.integration.spec.ts`: el árbitro inicia el partido y registra un gol que un espectador recibe por WebSocket; acta con `match.completed` y corrección versionada | 72,25 % | 93,84 % |
-| statistics-service | «recalcula la tabla al recibir match.completed y avisa con standings.updated» | «procesar el mismo evento dos veces no duplica efectos (idempotencia)» | `statistics.integration.spec.ts`: con `match.completed` recalcula tabla, goleadores y tarjetas; acta repetida, corrección y conciliación con Live Score Service | 72,28 % | 93,42 % |
-| notification-service | «notifica al organizador y a los aficionados de la liga, y registra los envíos» | «respeta las preferencias: sin correo ni push para quien los desactivó» | `notification.integration.spec.ts`: suscripciones y preferencias; `league.created` y `match.completed` generan avisos y correos por el relé simulado; idempotencia y relé caído (FAILED) | 67,90 % | 85,53 % |
-| analytics-service | «extrae de las réplicas, carga las tablas en una sola transacción y marca la corrida SUCCESS» | «si una réplica no responde registra la corrida FAILED y no toca las tablas analíticas» | `analytics.integration.spec.ts`: ETL sobre réplicas de solo lectura en PostgreSQL (KPIs, asistencia y tendencia); una segunda corrida no duplica filas y una réplica caída deja la corrida FAILED | 57,49 % | 90,86 % |
+| api-gateway | «consulta el /health de todos los servicios como mucho una vez por intervalo» | «no retrasa ni rompe la petición si un servicio no responde» | `gateway.integration.spec.ts`: la cadena completa del gateway frente a los 9 servicios simulados por HTTP (enrutamiento, JWT, roles, CORS, rate limiting con 429, 503 y `/metrics`) | 57,46 % | 88,63 % |
+| auth-service | «suspender a un usuario revoca sus sesiones, lo marca en Redis para el gateway y publica user.updated» | «el administrador no puede cambiar su propio rol o estado» | `auth.integration.spec.ts`: registro, inicio de sesión, rotación del refresh token con CSRF, detección de reutilización y suspensión por el administrador, sobre PostgreSQL | 64,39 % | 84,10 % |
+| league-service | «crea la liga pendiente de aprobación y avisa con league.created» | «el administrador aprueba la liga y se publica league.reviewed» | `league.integration.spec.ts`: crea una liga y su temporada en PostgreSQL y las lee por HTTP; 401 sin token interno, 400 con fechas inválidas y 403 a otro organizador | 59,22 % | 69,46 % |
+| team-service | «valida la elegibilidad automáticamente al fichar un jugador» | «deja al jugador pendiente cuando no se puede consultar la categoría» | `team.integration.spec.ts`: registra un equipo con los datos de League Service, ficha jugadores y calcula su elegibilidad; 404, 409 y 400; con League Service caído usa la caché | 68,14 % | 70,59 % |
+| fixture-service | «genera el calendario completo de la categoría en borrador» | «actualiza el estado del partido de forma idempotente al recibir match.completed» | `fixture.integration.spec.ts`: genera el calendario en borrador, lo publica (un `fixture.published` por jornada), reprograma un partido y sigue `match.started` y `match.completed` | 72,07 % | 84,42 % |
+| referee-service | «asigna automáticamente al árbitro de la misma zona y publica referee.assigned» | «avisa con referee.unassigned cuando nadie está disponible» | `referee.integration.spec.ts`: registra árbitros, los asigna por zona al recibir `fixture.published` sin duplicar, avisa si nadie está disponible y busca reemplazo cuando el árbitro rechaza | 60,04 % | 68,86 % |
+| live-score-service | «el árbitro asignado registra un gol, se calcula el marcador y se publica match.event» | «al finalizar publica el acta (match.completed) con el marcador y la versión» | `live.integration.spec.ts`: el árbitro inicia el partido y registra un gol que un espectador recibe por WebSocket; acta con `match.completed` y corrección versionada | 74,43 % | 93,84 % |
+| statistics-service | «recalcula la tabla al recibir match.completed y avisa con standings.updated» | «procesar el mismo evento dos veces no duplica efectos (idempotencia)» | `statistics.integration.spec.ts`: con `match.completed` recalcula tabla, goleadores y tarjetas; acta repetida, corrección y conciliación con Live Score Service | 74,64 % | 93,42 % |
+| notification-service | «notifica al organizador y a los aficionados de la liga, y registra los envíos» | «respeta las preferencias: sin correo ni push para quien los desactivó» | `notification.integration.spec.ts`: suscripciones y preferencias; `league.created` y `match.completed` generan avisos y correos por el relé simulado; idempotencia y relé caído (FAILED) | 70,43 % | 85,53 % |
+| analytics-service | «extrae de las réplicas, carga las tablas en una sola transacción y marca la corrida SUCCESS» | «si una réplica no responde registra la corrida FAILED y no toca las tablas analíticas» | `analytics.integration.spec.ts`: ETL sobre réplicas de solo lectura en PostgreSQL (KPIs, asistencia y tendencia); una segunda corrida no duplica filas y una réplica caída deja la corrida FAILED | 60,32 % | 91,26 % |
 
 **Cómo leer la cobertura.** Las dos columnas son cobertura de líneas.
 
@@ -57,19 +57,23 @@ los que depende cada uno, de modo que las llamadas pasan por el cliente HTTP rea
 
 | Microservicio | Pruebas | Ejecución en GitHub Actions |
 |---|---|---|
-| api-gateway | 44 | [sportsleague-api-gateway](https://github.com/javierlydiaz21-bit/sportsleague-api-gateway/actions/runs/43946860046) |
-| auth-service | 26 | [sportsleague-auth-service](https://github.com/javierlydiaz21-bit/sportsleague-auth-service/actions/runs/43946882494) |
-| league-service | 19 | [sportsleague-league-service](https://github.com/javierlydiaz21-bit/sportsleague-league-service/actions/runs/43946936756) |
-| team-service | 20 | [sportsleague-team-service](https://github.com/javierlydiaz21-bit/sportsleague-team-service/actions/runs/43947060697) |
-| fixture-service | 38 | [sportsleague-fixture-service](https://github.com/javierlydiaz21-bit/sportsleague-fixture-service/actions/runs/43946908324) |
-| referee-service | 19 | [sportsleague-referee-service](https://github.com/javierlydiaz21-bit/sportsleague-referee-service/actions/runs/43947012912) |
-| live-score-service | 21 | [sportsleague-live-score-service](https://github.com/javierlydiaz21-bit/sportsleague-live-score-service/actions/runs/43946960391) |
-| statistics-service | 20 | [sportsleague-statistics-service](https://github.com/javierlydiaz21-bit/sportsleague-statistics-service/actions/runs/43947034869) |
-| notification-service | 30 (29 pasan y 1 opcional se omite) | [sportsleague-notification-service](https://github.com/javierlydiaz21-bit/sportsleague-notification-service/actions/runs/43946989173) |
-| analytics-service | 19 | [sportsleague-analytics-service](https://github.com/javierlydiaz21-bit/sportsleague-analytics-service/actions/runs/43946834028) |
-| **Total** | **256 (255 pasan y 1 se omite)** | |
+| api-gateway | 54 | [sportsleague · api-gateway](https://github.com/javierlydiaz21-bit/sportsleague/actions/runs/44358095894) |
+| auth-service | 34 | [sportsleague · auth-service](https://github.com/javierlydiaz21-bit/sportsleague/actions/runs/44358095725) |
+| league-service | 27 | [sportsleague · league-service](https://github.com/javierlydiaz21-bit/sportsleague/actions/runs/44358095362) |
+| team-service | 28 | [sportsleague · team-service](https://github.com/javierlydiaz21-bit/sportsleague/actions/runs/44358095467) |
+| fixture-service | 46 | [sportsleague · fixture-service](https://github.com/javierlydiaz21-bit/sportsleague/actions/runs/44358095406) |
+| referee-service | 27 | [sportsleague · referee-service](https://github.com/javierlydiaz21-bit/sportsleague/actions/runs/44358095370) |
+| live-score-service | 29 | [sportsleague · live-score-service](https://github.com/javierlydiaz21-bit/sportsleague/actions/runs/44358095906) |
+| statistics-service | 28 | [sportsleague · statistics-service](https://github.com/javierlydiaz21-bit/sportsleague/actions/runs/44358095586) |
+| notification-service | 38 (37 pasan y 1 opcional se omite) | [sportsleague · notification-service](https://github.com/javierlydiaz21-bit/sportsleague/actions/runs/44358095592) |
+| analytics-service | 32 | [sportsleague · analytics-service](https://github.com/javierlydiaz21-bit/sportsleague/actions/runs/44358095365) |
+| **Total** | **343 (342 pasan y 1 se omite)** | |
 
 En cada ejecución, el informe de cobertura queda como artefacto `coverage-<servicio>`.
+
+Los totales incluyen las pruebas del chassis, que corren en los 10 servicios: la documentación
+OpenAPI (`/docs` y `/openapi.json`), `/metrics` con y sin `METRICS_TOKEN` y el log por solicitud
+con la IP del cliente.
 
 ## Cómo ejecutarlas
 
