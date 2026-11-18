@@ -5,6 +5,7 @@ import { AllExceptionsFilter } from './errors';
 import { httpObservability } from './http-observability';
 import { JsonLogger, log } from './logger';
 import { initMetrics } from './metrics';
+import { setupOpenApi, type OpenApiOptions } from './openapi';
 import { createValidationPipe } from './validation';
 
 export interface BootstrapOptions {
@@ -14,6 +15,8 @@ export interface BootstrapOptions {
   bodyParser?: boolean;
   routeFromPath?: boolean;
   configure?: (app: NestExpressApplication) => void | Promise<void>;
+  /** Ajustes de /docs y /openapi.json (descripción, esquema Bearer). */
+  openapi?: Pick<OpenApiOptions, 'description' | 'bearer'>;
 }
 
 export type AppSetupOptions = Pick<BootstrapOptions, 'bodyParser' | 'routeFromPath'>;
@@ -49,6 +52,8 @@ export async function bootstrapService(rootModule: any, options: BootstrapOption
   app.enableShutdownHooks();
 
   await options.configure?.(app);
+  // Después de configure: en el gateway, /docs pasa por los mismos middlewares (helmet, CORS) que el resto.
+  setupOpenApi(app, { name: options.name, version: serviceInfo.version, ...options.openapi });
 
   const port = envInt('PORT', options.defaultPort);
   await app.listen(port, '0.0.0.0');

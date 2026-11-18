@@ -228,7 +228,9 @@ entre paréntesis, la comprobación adicional del servicio.
 | GET | `/api/v1/live/matches` | Público | Actas con su marcador, filtradas por `ids`, `leagueId`, `seasonId`, `categoryId` y `status`; `includeEvents=true` añade todos los eventos (si no, solo los goles); `limit` hasta 500. |
 | GET | `/health` | Abierto | Salud del servicio (base de datos y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria, checks, circuitos (Fixture, Referee y Team) y suscripciones; lo consulta el panel *Sistema* del gateway. |
-| GET | `/metrics` | Abierto | Métricas Prometheus, incluidas `match_events_registered_total{type,league_id,season_id,category_id}`, `live_score_update_latency_seconds`, `live_ws_connections` y `live_viewers_total`. |
+| GET | `/metrics` | Abierto (con `METRICS_TOKEN`, exige ese Bearer) | Métricas Prometheus, incluidas `match_events_registered_total{type,league_id,season_id,category_id}`, `live_score_update_latency_seconds`, `live_ws_connections` y `live_viewers_total`. |
+| GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
+| GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
 En el gateway, `/api/v1/matches/:id/events`, `/live`, `/start` y `/complete` y todo `/api/v1/live/*` se
 envían a este servicio; el resto de `/api/v1/matches/*` va al Fixture Service.
@@ -353,6 +355,7 @@ del archivo.
 | `TEAM_SERVICE_URL` | No | `http://localhost:4003` | URL del Team Service. Docker Compose: `http://team-service:4003`. |
 | `WS_ALLOWED_ORIGINS` | No | `http://localhost:3000` | Webs que pueden abrir el WebSocket, separadas por comas; las demás se rechazan. Render: `https://sportsleague-cyan.vercel.app`. |
 | `LOG_LEVEL` | No | `info` | Nivel mínimo de log: `debug`, `info`, `warn` o `error`. |
+| `METRICS_TOKEN` | No | — | Si existe, `/metrics` exige `Authorization: Bearer <METRICS_TOKEN>` (recolección desde Grafana Cloud). Sin ella, `/metrics` queda abierto, como en local. |
 | `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express (de qué proxies se acepta `X-Forwarded-For`). |
 | `SERVICE_NAME` | No | `live-score-service` | Nombre del servicio en logs, métricas y en el campo `source` de los eventos. |
 | `SERVICE_VERSION` | No | `1.0.0` | Versión que informa `/status`. |
@@ -363,11 +366,15 @@ servicio no las usa.
 
 ## Despliegue
 
-- **Imagen Docker**: `ghcr.io/javierlydiaz21-bit/sportsleague-app-live-score-service`, publicada por
-  GitHub Actions desde el repositorio principal (`.github/workflows/live-score-service.yml`, que llama a
-  `service-pipeline.yml`): `npm ci` → ESLint → Jest con cobertura → `npm run build` → prueba de carga con
-  k6 → imagen en GHCR con las etiquetas `:<sha>` y `:latest` (rama `main`) o `:develop` → despliegue en
-  Render con el *deploy hook* del secreto `RENDER_DEPLOY_HOOK_LIVE_SCORE`.
+- **Despliegue continuo** (`.github/workflows/deploy.yml` de este repositorio): en cada push a `main`
+  (el merge de un Pull Request) corre el CI (`ci-servicio.yml@v1`: ESLint, Jest con PostgreSQL y
+  cobertura, build y gitleaks) y, **solo si pasa**, publica la imagen
+  `ghcr.io/javierlydiaz21-bit/sportsleague-app-live-score-service` con las etiquetas `:<sha>` y `:latest` y la
+  despliega en Render con el *deploy hook* del secreto `RENDER_DEPLOY_HOOK`. Si el secreto falta, el
+  despliegue falla. `ci.yml` prueba los Pull Requests y la rama `develop`.
+- **Requisitos en GitHub**: el secreto `RENDER_DEPLOY_HOOK` (Render → servicio → *Settings* → *Deploy
+  Hook*) y el rol *Write* de este repositorio sobre el paquete `sportsleague-app-live-score-service`
+  (*Package settings* → *Manage Actions access*).
 - **Render Free** (blueprint `render-free.yaml`): https://sportsleague-jd-live.onrender.com. Es la URL del
   WebSocket que usa la web (`NEXT_PUBLIC_WS_URL` en Vercel). Usa la PostgreSQL gratuita compartida
   `sportsleague-jd-db` con su propia base (`DATABASE_NAME`) y el Key Value `sportsleague-jd-redis`.

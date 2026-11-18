@@ -277,7 +277,8 @@ Para propagar una mejora: `node scripts/sync-chassis.mjs`.
 ## Observabilidad
 
 - **Logs estructurados (JSON)** en todos los servicios con `requestId`, `userId` y `match_id`.
-  El `x-request-id` se propaga entre servicios y eventos.
+  Cada solicitud deja un log `http_request` con fecha y hora, IP del cliente, método, ruta,
+  código, duración y usuario. El `x-request-id` se propaga entre servicios y eventos.
 - **Trazabilidad completa por `match_id`**: todo log con `matchId` se replica en un Redis Stream
   (`trace:match:<id>`). *Administración → Trazabilidad* muestra el recorrido de un partido por
   todos los microservicios: publicación, asignación de árbitro, eventos en vivo, acta, recálculo
@@ -288,6 +289,8 @@ Para propagar una mejora: `node scripts/sync-chassis.mjs`.
   difunde por WebSocket), `live_viewers_total`, `standings_recalculations_total`,
   `referee_assignments_total`, `circuit_breaker_state`, `gateway_rate_limit_rejections_total`.
 - **Grafana**: dashboard "SportsLeague — Jornada en vivo" con filtros por liga, temporada y categoría.
+  Por microservicio muestra disponibilidad (ARRIBA/CAÍDO), peticiones por segundo, tiempo de
+  respuesta p95 y tasa de errores 5xx (en %).
 - **Alertas** (`infra/prometheus/alerts.yml`): servicio caído, tasa de errores, latencia del
   gateway, latencia del marcador en vivo, CPU alta en Live Score, circuito abierto.
 - **Health checks**: `/health` (base de datos + Redis; Render lo usa para los rolling updates) y
@@ -328,7 +331,9 @@ detener.bat              detiene los contenedores conservando los datos
 
 ## Pruebas
 
-Cada servicio tiene pruebas unitarias e integración HTTP con Jest (155 pruebas en total), por ejemplo:
+Cada servicio tiene pruebas unitarias y de integración (HTTP y contra PostgreSQL real) con Jest:
+343 en total. El detalle por servicio, con la cobertura, está en
+[EVIDENCIAS_PRUEBAS.md](EVIDENCIAS_PRUEBAS.md). Por ejemplo:
 
 - Fixture: propiedades del round-robin (cada par se enfrenta una vez, localía equilibrada ±1,
   nadie juega dos veces por jornada) y del calendario (descanso mínimo, canchas y horarios).
@@ -381,42 +386,79 @@ npm run start:dev
 ## CI/CD y despliegue
 
 - **Un solo CI para todos los servicios**: `ci-servicio.yml` es un workflow reutilizable con tres
-  jobs: *Lint, pruebas y build* (npm ci → Prisma → ESLint → Jest con cobertura → build), *Escaneo
-  de secretos* (gitleaks sobre todo el historial, con los valores ocultos en el log) e *Imagen
-  Docker* (construye sin publicar). Lo usan los 10 repositorios de servicio con `@v1` y este
-  repositorio antes de publicar cada imagen: lo que se prueba en un repositorio es lo mismo que
-  se prueba antes de desplegar. Un cambio compatible mueve la etiqueta `v1`
-  (`git tag -f v1 && git push -f origin v1`); uno incompatible va en `v2`.
-- `.github/workflows/<servicio>.yml`: se dispara solo cuando cambia ese servicio (o el CI
-  compartido) y llama a `service-pipeline.yml`: **ci-servicio → (k6 en Live Score) → imagen Docker
-  publicada en GHCR** (`ghcr.io/<owner>/sportsleague-app-<servicio>:<sha>`) → **despliegue en
-  Render** con rolling update (solo en `main`). El prefijo `sportsleague-app-` evita chocar con los
-  paquetes `sportsleague-<servicio>` del proyecto anterior (`sportsleague-ms`), en los que este
-  repositorio no tiene permiso de escritura.
-- **Credenciales**: el único secreto es el deploy hook de Render de cada servicio
-  (`RENDER_DEPLOY_HOOK_<SERVICIO>`, p. ej. `RENDER_DEPLOY_HOOK_LIVE_SCORE`), y solo lo lee el job de
-  despliegue; sin él, el despliegue se omite sin fallar. Los repositorios de servicio no tienen
-  secretos. El `GITHUB_TOKEN` es de solo lectura salvo `packages: write` en el job que publica la
-  imagen, los checkout no guardan la credencial (`persist-credentials: false`), las acciones
-  están fijadas por SHA y gitleaks se verifica con su SHA-256 antes de ejecutarse. gitleaks solo
-  permite, por valor exacto, el token de desarrollo `dev-internal-token-change-me` de los ejemplos.
+  jobs: *Lint, pruebas y build* (npm ci → Prisma → ESLint → Jest con PostgreSQL y cobertura →
+  build), *Escaneo de secretos* (gitleaks sobre todo el historial, con los valores ocultos en el
+  log) e *Imagen Docker* (construye sin publicar). Lo usan los 10 repositorios de servicio con `@v1`
+  y este repositorio: lo que se prueba aquí es lo mismo que se prueba antes de desplegar. Un
+  cambio compatible mueve la etiqueta `v1`; uno incompatible va en `v2`.
+- **Despliegue continuo desde cada repositorio de servicio** (`.github/workflows/deploy.yml` de
+  `sportsleague-<servicio>`): en cada push a `main`, es decir, al fusionar un Pull Request:
+  1. Corre el CI (`ci-servicio.yml@v1`).
+  2. **Solo si pasa**, publica la imagen `ghcr.io/<owner>/sportsleague-app-<servicio>` con las
+     etiquetas `:<sha>` y `:latest`.
+  3. Llama al *deploy hook* de Render con la imagen de ese commit (rolling update, health check en
+     `/health`). Si falta el secreto del hook, el despliegue falla en vez de omitirse.
+
+  Una prueba fallida no llega a producción: el CI del Pull Request falla y `main` exige ese check
+  para fusionar. Evidencia: Pull Request «DEMO: prueba fallida — no fusionar» (rama
+  `demo/falla-prueba`) en `sportsleague-team-service`. El prefijo `sportsleague-app-` evita chocar
+  con los paquetes `sportsleague-<servicio>` del proyecto anterior (`sportsleague-ms`).
+- **Este repositorio** (`.github/workflows/<servicio>.yml` → `service-pipeline.yml`): se dispara
+  cuando cambia ese servicio o el CI compartido y ejecuta `ci-servicio.yml` (con la imagen
+  construida sin publicar) y, en Live Score, las pruebas de carga con k6. **No publica imágenes ni
+  despliega**, para que nada se despliegue dos veces.
+- **Credenciales**:
+  - Cada repositorio de servicio tiene un solo secreto, `RENDER_DEPLOY_HOOK` (el *deploy hook* de su
+    servicio en Render), que solo lee el job de despliegue.
+  - El `GITHUB_TOKEN` tiene `packages: write` solo en ese job, y el repositorio necesita el rol
+    *Write* sobre su paquete `sportsleague-app-<servicio>` (*Package settings* → *Manage Actions access*).
+  - Este repositorio no tiene secretos.
+  - Los checkout no guardan la credencial (`persist-credentials: false`), las acciones están fijadas
+    por SHA y gitleaks se verifica con su SHA-256 antes de ejecutarse. gitleaks solo permite, por
+    valor exacto, el token de desarrollo `dev-internal-token-change-me` de los ejemplos.
 - **Rollback**: volver a desplegar en Render la imagen de un `sha` anterior (todas quedan versionadas en GHCR).
 - **Migraciones**: cada contenedor ejecuta `prisma migrate deploy` antes de recibir tráfico.
-- **Frontend**: `frontend.yml` hace lint, chequeo de tipos y build; el despliegue lo hace
-  Vercel con su integración de GitHub (preview por Pull Request). Variables en Vercel:
-  `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`, `API_INTERNAL_URL`.
+- **Frontend**: `frontend.yml` hace lint, chequeo de tipos y build. El despliegue lo hace Vercel con
+  su integración de GitHub: producción desde `main` y un *preview* por Pull Request. Variables en
+  Vercel: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`, `API_INTERNAL_URL` y `NEXT_PUBLIC_GRAFANA_URL`
+  (el dashboard público de Grafana Cloud).
 - `render.yaml`: blueprint de referencia con los 10 servicios (gateway y Live Score públicos, el
   resto privados), 9 bases de datos y Redis (Key Value). Requiere planes de pago de Render.
 - `render-free.yaml`: variante **gratuita** para demostraciones (ver la sección siguiente).
-- Flujo Git: `feature/*` → `develop` → `main`, `hotfix/*` desde `main`; PR con revisión y checks en
-  verde. `main` está protegida: solo cambia por Pull Request (también para los administradores) y
-  sin *force push*. No exige checks concretos porque cada workflow solo corre si cambia su carpeta.
+
+### Estrategia de ramas y control de versiones
+
+| Rama | Para qué | Cómo cambia |
+|---|---|---|
+| `main` | Lo que está en producción | Solo por Pull Request, también para los administradores, y sin *force push*. En los repositorios de servicio exige además los checks del CI en verde, y cada merge despliega ese servicio |
+| `develop` | Integración de lo terminado | Pull Requests desde `feature/*` con el CI en verde |
+| `feature/*` | Un cambio cada una (p. ej. `feature/openapi`, `feature/metrics-token`) | Se crean desde `develop` y vuelven a `develop` por Pull Request |
+| `hotfix/*` | Urgencias de producción | Se crean desde `main` y se fusionan en `main` y en `develop` |
+| `demo/*` | Demostraciones que nunca se fusionan (p. ej. `demo/falla-prueba`) | — |
+
+**Release:**
+
+1. Pull Request de `develop` a `main` en este repositorio. Al fusionar, Vercel publica la web.
+2. Para cada servicio que cambió, `git subtree split` de `services/<servicio>` y push a `develop`
+   de su repositorio, solo con avance directo (ver la sección siguiente).
+3. En ese repositorio, Pull Request de `develop` a `main`. Al fusionarla, su `deploy.yml` prueba y
+   despliega el servicio.
+
+**Versionado:**
+
+- El CI compartido usa etiquetas: `v1.0.0`, `v1.1.0` y `v1`, que es la que usan los repositorios de
+  servicio.
+- Las imágenes llevan el `sha` del commit.
+- La API se versiona con el prefijo `/api/v1`.
 
 ### Un repositorio por microservicio
 
 Además de este repositorio principal (donde se trabaja), cada servicio está publicado con su
-historial como repositorio independiente, con su README, `.env.example`, `database/` y su CI
-(`ci-servicio.yml@v1` en cada push y Pull Request a `main` y `develop`):
+historial como repositorio independiente, con su README, `.env.example` y `database/`, y con dos
+workflows:
+
+- `ci.yml` (`ci-servicio.yml@v1`): en cada Pull Request y en `develop`.
+- `deploy.yml`: CI y despliegue en cada push a `main`.
 
 | Servicio | Repositorio |
 |---|---|
@@ -440,7 +482,8 @@ git push https://github.com/javierlydiaz21-bit/sportsleague-fixture-service.git 
 # y en GitHub: Pull Request develop → main en sportsleague-fixture-service
 ```
 
-Las imágenes que usa Render las sigue publicando este repositorio (`sportsleague-app-<servicio>`).
+Las imágenes que usa Render (`sportsleague-app-<servicio>`) las publica el `deploy.yml` de cada
+repositorio de servicio.
 
 ### Despliegue gratuito (Render Free + Vercel Hobby)
 
@@ -574,9 +617,12 @@ debe volver a pulsar *Activar*. Sin claves, el push queda como `SIMULATED`.
   servicio tiene su propia **base** dentro de ella (`DATABASE_NAME`); en Docker Compose cada
   servicio tiene además su propio usuario. `render.yaml` (de pago) usa una instancia por servicio.
 - **Sin entorno de staging en la nube**: el plan gratuito no admite una segunda base de datos. La
-  rama `develop` publica imágenes con la etiqueta `develop`, que se prueban en local con Docker
-  Compose, y Vercel crea un *preview* por Pull Request para la web.
+  rama `develop` se prueba en el CI (con PostgreSQL) y en local con Docker Compose, y Vercel crea un
+  *preview* por Pull Request para la web.
 - **Réplicas de lectura en local**: se simulan con el usuario de solo lectura `analytics_ro`;
   con planes de pago (`render.yaml`) se apuntan réplicas reales (`*_REPLICA_URL`). En Render Free
   no hay réplicas ni usuarios por servicio: Analytics lee por su nombre las bases de Fixture, Live
-  Score y Statistics de la misma instancia, siempre en transacciones de solo lectura.
+  Score y Statistics de la misma instancia con el usuario de la instancia. Abre esas conexiones en
+  modo de solo lectura (`default_transaction_read_only=on`), y cualquier escritura falla. Es una
+  opción de la sesión, no un usuario con permisos restringidos (ver ANA-01 en
+  `MATRIZ_CUMPLIMIENTO.md`).

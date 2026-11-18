@@ -226,7 +226,9 @@ esos roles (`@Roles`).
 | PATCH | `/api/v1/matches/:id/status` | Sesión (organizador o `ADMIN`) | Suspende un partido programado o en curso (`status: "SUSPENDED"`, `reason`). Emite `match.suspended`. |
 | GET | `/health` | Abierto | Salud del servicio (base de datos y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria, checks, circuitos (League y Team) y suscripciones; lo consulta el panel *Sistema* del gateway. |
-| GET | `/metrics` | Abierto | Métricas Prometheus, incluidas `fixtures_generated_total` y `fixture_generation_duration_seconds`. |
+| GET | `/metrics` | Abierto (con `METRICS_TOKEN`, exige ese Bearer) | Métricas Prometheus, incluidas `fixtures_generated_total` y `fixture_generation_duration_seconds`. |
+| GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
+| GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
 En el gateway, las rutas `/api/v1/matches/:id/events`, `/live`, `/start` y `/complete` van al Live Score
 Service; el resto de `/api/v1/matches/*`, `/api/v1/fixtures/*` y `/api/v1/seasons/:id/fixtures/*` llega a
@@ -356,6 +358,7 @@ del archivo.
 | `TEAM_SERVICE_URL` | No | `http://localhost:4003` | URL del Team Service. Docker Compose: `http://team-service:4003`. |
 | `LEAGUE_UTC_OFFSET` | No | `-05:00` | Diferencia horaria de la liga respecto a UTC, para convertir a UTC la fecha y hora local de cada partido generado. |
 | `LOG_LEVEL` | No | `info` | Nivel mínimo de log: `debug`, `info`, `warn` o `error`. |
+| `METRICS_TOKEN` | No | — | Si existe, `/metrics` exige `Authorization: Bearer <METRICS_TOKEN>` (recolección desde Grafana Cloud). Sin ella, `/metrics` queda abierto, como en local. |
 | `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express (de qué proxies se acepta `X-Forwarded-For`). |
 | `SERVICE_NAME` | No | `fixture-service` | Nombre del servicio en logs, métricas y en el campo `source` de los eventos. |
 | `SERVICE_VERSION` | No | `1.0.0` | Versión que informa `/status`. |
@@ -365,11 +368,15 @@ del archivo.
 
 ## Despliegue
 
-- **Imagen Docker**: `ghcr.io/javierlydiaz21-bit/sportsleague-app-fixture-service`, publicada por GitHub
-  Actions desde el repositorio principal (`.github/workflows/fixture-service.yml`, que llama a
-  `service-pipeline.yml`): `npm ci` → ESLint → Jest con cobertura → `npm run build` → imagen en GHCR con
-  las etiquetas `:<sha>` y `:latest` (rama `main`) o `:develop` → despliegue en Render con el *deploy hook*
-  del secreto `RENDER_DEPLOY_HOOK_FIXTURE`.
+- **Despliegue continuo** (`.github/workflows/deploy.yml` de este repositorio): en cada push a `main`
+  (el merge de un Pull Request) corre el CI (`ci-servicio.yml@v1`: ESLint, Jest con PostgreSQL y
+  cobertura, build y gitleaks) y, **solo si pasa**, publica la imagen
+  `ghcr.io/javierlydiaz21-bit/sportsleague-app-fixture-service` con las etiquetas `:<sha>` y `:latest` y la
+  despliega en Render con el *deploy hook* del secreto `RENDER_DEPLOY_HOOK`. Si el secreto falta, el
+  despliegue falla. `ci.yml` prueba los Pull Requests y la rama `develop`.
+- **Requisitos en GitHub**: el secreto `RENDER_DEPLOY_HOOK` (Render → servicio → *Settings* → *Deploy
+  Hook*) y el rol *Write* de este repositorio sobre el paquete `sportsleague-app-fixture-service`
+  (*Package settings* → *Manage Actions access*).
 - **Render Free** (blueprint `render-free.yaml`): https://sportsleague-jd-fixture.onrender.com. Usa la
   PostgreSQL gratuita compartida `sportsleague-jd-db` con su propia base (`DATABASE_NAME`) y el Key Value
   `sportsleague-jd-redis`; llama a League y Team por sus URL públicas. Es un servicio web público, pero sin

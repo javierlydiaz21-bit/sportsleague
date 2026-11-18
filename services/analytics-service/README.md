@@ -1,7 +1,7 @@
 # Analytics Service · SportsLeague
 
 Microservicio de analítica de **SportsLeague**, la plataforma de gestión de ligas deportivas amateur
-(fútbol, básquet y vóley). Ejecuta un ETL periódico que lee, con un usuario de solo lectura, las bases de
+(fútbol, básquet y vóley). Ejecuta un ETL periódico que lee, en conexiones de solo lectura, las bases de
 Fixture, Live Score y Statistics (simulando las réplicas de lectura del documento de arquitectura) y
 guarda en su propia base indicadores listos para consultar: asistencia estimada, partidos suspendidos,
 tendencia de rendimiento de los equipos y KPIs por liga.
@@ -32,9 +32,13 @@ tendencia de rendimiento de los equipos y KPIs por liga.
 **Qué no hace**
 
 - No consume eventos ni llama por REST a otros servicios.
-- Nunca escribe en las bases operativas: el usuario `analytics_ro` solo tiene permiso `SELECT` y
-  `default_transaction_read_only = on`; cada réplica usa un pool de 2 conexiones con `statement_timeout`
-  de 15 s.
+- Nunca escribe en las bases operativas. Abre cada conexión a ellas con
+  `default_transaction_read_only=on` (`withReadOnlyTransactions` en `replica-url.ts`), así que
+  cualquier escritura falla.
+  - Es una opción de la sesión, no un usuario con permisos restringidos.
+  - En local, el usuario `analytics_ro` además solo tiene permiso `SELECT`.
+  - En Render Free se usa el usuario de la instancia, que sí podría desactivar esa opción.
+- Cada réplica usa un pool de 2 conexiones con `statement_timeout` de 15 s.
 
 **Por qué es un servicio aparte**: las consultas analíticas son pesadas y no deben competir con la
 operación diaria. Por eso leen réplicas de solo lectura (en local, el usuario `analytics_ro`) y guardan
@@ -188,10 +192,10 @@ Las pruebas desactivan el ETL programado (`ETL_DISABLED=true`) y lo ejecutan a m
 | Tipo | Archivo | Qué prueba | Qué se simula |
 |---|---|---|---|
 | Unitaria | `src/etl/transform.spec.ts` | Transformaciones: asistencia con acta o pico en línea, suspendidos, KPIs y tendencia acumulada | Nada (funciones puras) |
-| Unitaria | `src/etl/replica-url.spec.ts` | Resolución de las URL de las réplicas | Nada (funciones puras) |
-| Unitaria | `src/etl/etl.service.spec.ts` | Corrida completa en una transacción (`SUCCESS`), réplica caída (`FAILED` sin tocar las tablas) y candado de Redis entre instancias | Las réplicas (`pg.Pool`), Prisma y Redis (`jest.fn()`) |
+| Unitaria | `src/etl/replica-url.spec.ts` | Resolución de las URL de las réplicas y opción de solo lectura (sin perder las demás opciones) | Nada (funciones puras) |
+| Unitaria | `src/etl/etl.service.spec.ts` | Las tres conexiones se abren en solo lectura; corrida completa en una transacción (`SUCCESS`); réplica caída (`FAILED` sin tocar las tablas); candado de Redis entre instancias | Las réplicas (`pg.Pool`), Prisma y Redis (`jest.fn()`) |
 | Integración HTTP | `test/analytics.e2e.spec.ts` | Resumen global solo para `ADMIN` y analítica de liga solo para su organizador | Prisma, Redis y el bus de eventos |
-| Integración con PostgreSQL | `test/integration/analytics.integration.spec.ts` | ETL real sobre tres réplicas (esquemas con las tablas que lee y datos conocidos) conectadas en solo lectura → KPIs, asistencia estimada, suspendidos y tendencia por HTTP; segunda corrida sin duplicar; réplica rota (`FAILED`, se conserva la analítica anterior); 403 de otro organizador y de un aficionado; `/metrics` | Solo Redis (candado del ETL) |
+| Integración con PostgreSQL | `test/integration/analytics.integration.spec.ts` | ETL real sobre tres réplicas (esquemas con las tablas que lee y datos conocidos) conectadas en solo lectura (una escritura por esa conexión falla) → KPIs, asistencia estimada, suspendidos y tendencia por HTTP; segunda corrida sin duplicar; réplica rota (`FAILED`, se conserva la analítica anterior); 403 de otro organizador y de un aficionado; `/metrics` | Solo Redis (candado del ETL) |
 
 La prueba de integración con PostgreSQL usa `TEST_DATABASE_URL`. Por defecto es la PostgreSQL de Docker
 Compose del repositorio principal (`docker compose up -d postgres`):
@@ -224,7 +228,9 @@ entre paréntesis, la comprobación adicional del servicio. *Rol* = solo esos ro
 | GET | `/api/v1/analytics/etl/runs` | Rol `ADMIN` | Últimas 30 corridas del ETL. |
 | GET | `/health` | Abierto | Salud del servicio (base de datos propia y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria y checks; lo consulta el panel *Sistema* del gateway. |
-| GET | `/metrics` | Abierto | Métricas Prometheus, incluidas `etl_runs_total{status}` y `etl_duration_seconds`. |
+| GET | `/metrics` | Abierto (con `METRICS_TOKEN`, exige ese Bearer) | Métricas Prometheus, incluidas `etl_runs_total{status}` y `etl_duration_seconds`. |
+| GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
+| GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
 En el gateway, `/api/v1/analytics/overview` y `/api/v1/analytics/etl/*` también están restringidas a
 `ADMIN`.
@@ -302,6 +308,7 @@ del archivo.
 | `REDIS_URL` | No | `redis://localhost:6379` | Redis para el candado del ETL y las trazas. Docker Compose: `redis://redis:6379`. |
 | `INTERNAL_API_TOKEN` | Sí | — | Token compartido con el gateway y los demás servicios. Sin él, todas las rutas salvo `/health` y `/metrics` responden `401`. |
 | `LOG_LEVEL` | No | `info` | Nivel mínimo de log: `debug`, `info`, `warn` o `error`. |
+| `METRICS_TOKEN` | No | — | Si existe, `/metrics` exige `Authorization: Bearer <METRICS_TOKEN>` (recolección desde Grafana Cloud). Sin ella, `/metrics` queda abierto, como en local. |
 | `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express (de qué proxies se acepta `X-Forwarded-For`). |
 | `SERVICE_NAME` | No | `analytics-service` | Nombre del servicio en logs y métricas. |
 | `SERVICE_VERSION` | No | `1.0.0` | Versión que informa `/status`. |
@@ -312,11 +319,15 @@ servicio no las usa.
 
 ## Despliegue
 
-- **Imagen Docker**: `ghcr.io/javierlydiaz21-bit/sportsleague-app-analytics-service`, publicada por
-  GitHub Actions desde el repositorio principal (`.github/workflows/analytics-service.yml`, que llama a
-  `service-pipeline.yml`): `npm ci` → ESLint → Jest con cobertura → `npm run build` → imagen en GHCR con
-  las etiquetas `:<sha>` y `:latest` (rama `main`) o `:develop` → despliegue en Render con el *deploy hook*
-  del secreto `RENDER_DEPLOY_HOOK_ANALYTICS`.
+- **Despliegue continuo** (`.github/workflows/deploy.yml` de este repositorio): en cada push a `main`
+  (el merge de un Pull Request) corre el CI (`ci-servicio.yml@v1`: ESLint, Jest con PostgreSQL y
+  cobertura, build y gitleaks) y, **solo si pasa**, publica la imagen
+  `ghcr.io/javierlydiaz21-bit/sportsleague-app-analytics-service` con las etiquetas `:<sha>` y `:latest` y la
+  despliega en Render con el *deploy hook* del secreto `RENDER_DEPLOY_HOOK`. Si el secreto falta, el
+  despliegue falla. `ci.yml` prueba los Pull Requests y la rama `develop`.
+- **Requisitos en GitHub**: el secreto `RENDER_DEPLOY_HOOK` (Render → servicio → *Settings* → *Deploy
+  Hook*) y el rol *Write* de este repositorio sobre el paquete `sportsleague-app-analytics-service`
+  (*Package settings* → *Manage Actions access*).
 - **Render Free** (blueprint `render-free.yaml`): https://sportsleague-jd-analytics.onrender.com. Usa la
   PostgreSQL gratuita compartida `sportsleague-jd-db` con su propia base (`DATABASE_NAME`) y lee las bases
   de Fixture, Live Score y Statistics de la misma instancia por su nombre (`FIXTURE_REPLICA_URL=fixture_db`,

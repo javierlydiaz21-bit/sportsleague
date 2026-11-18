@@ -44,7 +44,7 @@ services:
       - key: JWT_SECRET
         sync: false
       - key: CORS_ORIGINS
-        sync: false # p. ej. https://sportsleague.vercel.app
+        sync: false # p. ej. https://sportsleague-cyan.vercel.app
       - key: TRUST_PROXY
         value: "1"
       - key: REDIS_URL
@@ -175,7 +175,7 @@ services:
       - key: TEAM_SERVICE_URL
         fromService: { type: pserv, name: sportsleague-team-service, property: hostport }
       - key: WS_ALLOWED_ORIGINS
-        sync: false # p. ej. https://sportsleague.vercel.app
+        sync: false # p. ej. https://sportsleague-cyan.vercel.app
 
   - type: pserv
     name: sportsleague-statistics-service

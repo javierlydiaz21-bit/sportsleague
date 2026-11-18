@@ -1,6 +1,6 @@
-import { Controller, Get, Injectable, Res } from '@nestjs/common';
-import type { Response } from 'express';
-import { OpenEndpoint, Public } from './auth-context';
+import { Controller, Get, Injectable, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { OpenEndpoint, Public, isInternalTokenValid } from './auth-context';
 import { serviceInfo } from './config';
 import { EventBus } from './event-bus';
 import { registry } from './metrics';
@@ -21,6 +21,16 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     timer = setTimeout(() => reject(new Error(`timeout (${ms} ms)`)), ms);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * /metrics queda abierto si no existe METRICS_TOKEN (local: lo lee el Prometheus de docker compose).
+ * Si existe (producción: lo lee Grafana Cloud), exige Authorization: Bearer <METRICS_TOKEN>.
+ */
+export function isMetricsRequestAllowed(authorization: string | undefined, token = process.env.METRICS_TOKEN): boolean {
+  if (!token) return true;
+  const bearer = /^Bearer (.+)$/.exec(authorization ?? '')?.[1];
+  return isInternalTokenValid(bearer, token);
 }
 
 /** Cada servicio registra aquí sus dependencias críticas (base de datos, Redis...). */
@@ -89,7 +99,12 @@ export class HealthController {
 
   @OpenEndpoint()
   @Get('metrics')
-  async metrics(@Res() res: Response): Promise<void> {
+  async metrics(@Req() req: Request, @Res() res: Response): Promise<void> {
+    if (!isMetricsRequestAllowed(req.headers.authorization)) {
+      res.setHeader('WWW-Authenticate', 'Bearer realm="metrics"');
+      res.status(401).json({ statusCode: 401, message: 'Las métricas exigen Authorization: Bearer <METRICS_TOKEN>' });
+      return;
+    }
     res.setHeader('Content-Type', registry.contentType);
     res.send(await registry.metrics());
   }

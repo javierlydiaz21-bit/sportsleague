@@ -211,13 +211,16 @@ middleware del gateway).
 |---|---|---|---|
 | GET | `/health` | Abierto | Salud del gateway (Redis). `200` o `503`. |
 | GET | `/status` | Rol `ADMIN` | Versión, tiempo activo, memoria y checks del gateway. |
-| GET | `/metrics` | Abierto | Métricas Prometheus (HTTP, solicitudes y latencia por servicio destino, rechazos por rate limiting). |
+| GET | `/metrics` | Abierto (con `METRICS_TOKEN`, exige ese Bearer) | Métricas Prometheus (HTTP, solicitudes y latencia por servicio destino, rechazos por rate limiting). |
+| GET | `/docs` | Abierto | Documentación de la API del gateway (Swagger UI, generada con `@nestjs/swagger`). Con «Authorize» y el `accessToken` de un administrador se prueban las rutas de `/api/v1/system`. |
+| GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 | GET | `/api/v1/system/health` | Rol `ADMIN` | Salud agregada: consulta `/status` de los 9 servicios (con el token interno y timeout de 2,5 s), Redis y el número de suscriptores de cada canal de eventos (`PUBSUB NUMSUB`). Estado general `ok`, `degraded` o `down`. |
 | GET | `/api/v1/system/events` | Rol `ADMIN` | Últimos eventos del bus (lista `events:recent` de Redis); `limit` de 1 a 200, por defecto 50. |
 | GET | `/api/v1/system/traces` | Rol `ADMIN` | Partidos con trazas recientes y su última actividad; `limit` de 1 a 200, por defecto 30. |
 | GET | `/api/v1/system/traces/:matchId` | Rol `ADMIN` | Recorrido completo de un partido por todos los servicios (Redis Stream `trace:match:<id>`). |
 
-`/health`, `/status` y `/metrics` no llevan el prefijo `/api/v1` (ver `src/chassis/bootstrap.ts`).
+`/health`, `/status`, `/metrics`, `/docs` y `/openapi.json` no llevan el prefijo `/api/v1` (ver
+`src/chassis/bootstrap.ts` y `src/chassis/openapi.ts`).
 
 ### Tabla de enrutamiento
 
@@ -351,7 +354,8 @@ migraciones. Solo usa Redis:
 | `WAKE_SERVICES` | No | `false` | `true` activa el despertador de servicios (solo en Render Free). |
 | `WAKE_INTERVAL_MS` | No | `240000` | Intervalo mínimo entre dos rondas del despertador (4 minutos). |
 | `LOG_LEVEL` | No | `info` | Nivel mínimo de log: `debug`, `info`, `warn` o `error`. |
-| `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express; determina la IP del cliente para el rate limiting. Render: `1`. |
+| `METRICS_TOKEN` | No | — | Si existe, `/metrics` exige `Authorization: Bearer <METRICS_TOKEN>` (recolección desde Grafana Cloud). Sin ella, `/metrics` queda abierto, como en local. |
+| `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express; determina la IP del cliente para el rate limiting y los logs. Render: `1`. |
 | `SERVICE_NAME` | No | `api-gateway` | Nombre del servicio en logs y métricas. |
 | `SERVICE_VERSION` | No | `1.0.0` | Versión que informan `/status` y `/api/v1/system/health`. |
 | `TRACE_ENABLED` | No | activado | `false` desactiva la copia en Redis Streams de los logs que llevan `matchId`. |
@@ -361,11 +365,15 @@ gateway no las usa. No necesita `DATABASE_URL` ni `DATABASE_NAME`.
 
 ## Despliegue
 
-- **Imagen Docker**: `ghcr.io/javierlydiaz21-bit/sportsleague-app-api-gateway`, publicada por GitHub
-  Actions desde el repositorio principal (`.github/workflows/api-gateway.yml`, que llama a
-  `service-pipeline.yml`): `npm ci` → ESLint → Jest con cobertura → `npm run build` → imagen en GHCR con
-  las etiquetas `:<sha>` y `:latest` (rama `main`) o `:develop` → despliegue en Render con el *deploy hook*
-  del secreto `RENDER_DEPLOY_HOOK_GATEWAY`.
+- **Despliegue continuo** (`.github/workflows/deploy.yml` de este repositorio): en cada push a `main`
+  (el merge de un Pull Request) corre el CI (`ci-servicio.yml@v1`: ESLint, Jest con cobertura, build
+  y gitleaks) y, **solo si pasa**, publica la imagen
+  `ghcr.io/javierlydiaz21-bit/sportsleague-app-api-gateway` con las etiquetas `:<sha>` y `:latest` y la
+  despliega en Render con el *deploy hook* del secreto `RENDER_DEPLOY_HOOK`. Si el secreto falta, el
+  despliegue falla. `ci.yml` prueba los Pull Requests y la rama `develop`.
+- **Requisitos en GitHub**: el secreto `RENDER_DEPLOY_HOOK` (Render → servicio → *Settings* → *Deploy
+  Hook*) y el rol *Write* de este repositorio sobre el paquete `sportsleague-app-api-gateway`
+  (*Package settings* → *Manage Actions access*).
 - **Render Free** (blueprint `render-free.yaml`): https://sportsleague-jd-gateway.onrender.com. Es la URL
   que usa la web publicada en https://sportsleague-cyan.vercel.app (`NEXT_PUBLIC_API_URL` y
   `API_INTERNAL_URL` en Vercel). Allí se configuran `WAKE_SERVICES=true`, `PROXY_TIMEOUT_MS=60000`,

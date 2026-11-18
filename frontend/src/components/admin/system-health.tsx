@@ -3,6 +3,7 @@
 import { ExternalLink, Play } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import { PUBLIC_API_URL } from '@/lib/config';
 import { errorMessage, formatDateTime, relativeTime, uptime } from '@/lib/format';
 import { useAsync, usePolling } from '@/lib/hooks';
 import type { EtlRun, SystemHealth } from '@/lib/types';
@@ -24,8 +25,11 @@ const DELIVERY_STATUS: Record<string, { label: string; tone: 'green' | 'red' | '
   SIMULATED: { label: 'Simulado', tone: 'neutral' },
 };
 
-const GRAFANA_URL = process.env.NEXT_PUBLIC_GRAFANA_URL ?? 'http://localhost:3100';
-const PROMETHEUS_URL = process.env.NEXT_PUBLIC_PROMETHEUS_URL ?? 'http://localhost:9090';
+/** Frontend construido para el entorno local (docker compose): su API está en localhost o 127.0.0.1. */
+const IS_LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1)([:/]|$)/.test(PUBLIC_API_URL);
+// Cada enlace aparece si su URL está definida o si el frontend es local; en producción nunca apunta a localhost.
+const GRAFANA_URL = process.env.NEXT_PUBLIC_GRAFANA_URL || (IS_LOCAL ? 'http://localhost:3100' : undefined);
+const PROMETHEUS_URL = process.env.NEXT_PUBLIC_PROMETHEUS_URL || (IS_LOCAL ? 'http://localhost:9090' : undefined);
 
 export function SystemHealthView() {
   const { api } = useAuth();
@@ -57,14 +61,22 @@ export function SystemHealthView() {
           title="Microservicios"
           description={health ? `Comprobado ${relativeTime(health.checkedAt)} · se actualiza cada 10 s` : 'Consultando…'}
           action={
-            <div className="flex gap-3 text-sm">
-              <a href={GRAFANA_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-muted hover:text-fg">
-                Grafana <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-              <a href={PROMETHEUS_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-muted hover:text-fg">
-                Prometheus <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            </div>
+            GRAFANA_URL || PROMETHEUS_URL ? (
+              <div className="flex gap-3 text-sm">
+                {GRAFANA_URL && (
+                  <a href={GRAFANA_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-muted hover:text-fg">
+                    Grafana <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+                {PROMETHEUS_URL && (
+                  <a href={PROMETHEUS_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-muted hover:text-fg">
+                    Prometheus <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted">El monitoreo de producción estará en Grafana Cloud</p>
+            )
           }
         />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

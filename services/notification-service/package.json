@@ -25,6 +25,7 @@
     "@nestjs/common": "^11.2.7",
     "@nestjs/core": "^11.2.7",
     "@nestjs/platform-express": "^11.2.7",
+    "@nestjs/swagger": "^11.4.8",
     "@prisma/client": "^6.19.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
@@ -86,5 +87,8 @@
         "lines": 50
       }
     }
+  },
+  "scarfSettings": {
+    "enabled": false
   }
 }

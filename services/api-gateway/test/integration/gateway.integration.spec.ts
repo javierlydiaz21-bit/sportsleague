@@ -15,8 +15,8 @@ import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
-import { EventBus, InMemoryEventBus, RedisService, configureApp } from '../../src/chassis';
-import { configureGateway } from '../../src/gateway/setup';
+import { EventBus, InMemoryEventBus, RedisService, configureApp, setupOpenApi } from '../../src/chassis';
+import { GATEWAY_OPENAPI, configureGateway } from '../../src/gateway/setup';
 import { SERVICES, type ServiceName } from '../../src/gateway/routes';
 import { INTERNAL_TOKEN } from '../test-utils';
 
@@ -132,10 +132,11 @@ describe('API Gateway · integración (cadena completa frente a los microservici
       .overrideProvider(EventBus)
       .useValue(new InMemoryEventBus())
       .compile();
-    // Igual que bootstrapService en main.ts: configureApp con las opciones del gateway y luego configureGateway.
+    // Igual que bootstrapService en main.ts: configureApp con las opciones del gateway, configureGateway y /docs.
     app = moduleRef.createNestApplication<NestExpressApplication>({ logger: false, bodyParser: false });
     configureApp(app, { bodyParser: false, routeFromPath: true });
     configureGateway(app);
+    setupOpenApi(app, { name: 'api-gateway', version: '1.0.0', ...GATEWAY_OPENAPI });
     await app.init();
   });
 
@@ -238,6 +239,28 @@ describe('API Gateway · integración (cadena completa frente a los microservici
     expect(res.body).toMatchObject({ overall: 'degraded', summary: { up: 8, total: 9 }, redis: { status: 'up' } });
     const status = Object.fromEntries(res.body.services.map((s: { name: string; status: string }) => [s.name, s.status]));
     expect(status).toMatchObject({ league: 'up', auth: 'up', 'live-score': 'up', analytics: 'down' });
+  });
+
+  it('/docs y /openapi.json documentan las rutas del gateway con el esquema Bearer para probarlas con un JWT', async () => {
+    const doc = await http().get('/openapi.json').expect(200);
+    expect(doc.body.info.title).toBe('SportsLeague · api-gateway');
+    expect(doc.body.components.securitySchemes.bearer).toMatchObject({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' });
+    expect(doc.body.paths['/api/v1/system/health'].get).toMatchObject({ tags: ['system'], security: [{ bearer: [] }] });
+    expect(doc.body.paths['/health'].get.security).toBeUndefined();
+    const page = await http().get('/docs').expect(200);
+    expect(page.text).toContain('swagger-ui');
+  });
+
+  it('con METRICS_TOKEN, /metrics del gateway acepta ese Bearer (no lo trata como JWT) y rechaza al resto', async () => {
+    process.env.METRICS_TOKEN = 'secreto-de-metricas';
+    try {
+      await http().get('/metrics').expect(401);
+      await http().get('/metrics').set(ADMIN).expect(401); // un JWT válido no sirve como METRICS_TOKEN
+      const res = await http().get('/metrics').set('Authorization', 'Bearer secreto-de-metricas').expect(200);
+      expect(res.text).toContain('http_requests_total');
+    } finally {
+      delete process.env.METRICS_TOKEN;
+    }
   });
 
   it('/metrics cuenta peticiones por ruta, reenvíos por microservicio y rechazos por rate limiting', async () => {

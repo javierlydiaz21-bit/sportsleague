@@ -51,6 +51,8 @@ export function httpObservability(options: ObservabilityOptions = {}) {
 
       const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
       log[level]('http_request', {
+        // IP del cliente: con TRUST_PROXY (Render: 1) es la del cliente y no la del proxy.
+        ip: req.ip,
         method: req.method,
         path: (req.originalUrl ?? req.url).split('?')[0],
         status: res.statusCode,
