@@ -277,7 +277,8 @@ Para propagar una mejora: `node scripts/sync-chassis.mjs`.
 ## Observabilidad
 
 - **Logs estructurados (JSON)** en todos los servicios con `requestId`, `userId` y `match_id`.
-  El `x-request-id` se propaga entre servicios y eventos.
+  Cada solicitud deja un log `http_request` con fecha y hora, IP del cliente, método, ruta,
+  código, duración y usuario. El `x-request-id` se propaga entre servicios y eventos.
 - **Trazabilidad completa por `match_id`**: todo log con `matchId` se replica en un Redis Stream
   (`trace:match:<id>`). *Administración → Trazabilidad* muestra el recorrido de un partido por
   todos los microservicios: publicación, asignación de árbitro, eventos en vivo, acta, recálculo

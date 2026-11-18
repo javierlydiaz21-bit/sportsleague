@@ -355,7 +355,7 @@ migraciones. Solo usa Redis:
 | `WAKE_INTERVAL_MS` | No | `240000` | Intervalo mínimo entre dos rondas del despertador (4 minutos). |
 | `LOG_LEVEL` | No | `info` | Nivel mínimo de log: `debug`, `info`, `warn` o `error`. |
 | `METRICS_TOKEN` | No | — | Si existe, `/metrics` exige `Authorization: Bearer <METRICS_TOKEN>` (recolección desde Grafana Cloud). Sin ella, `/metrics` queda abierto, como en local. |
-| `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express; determina la IP del cliente para el rate limiting. Render: `1`. |
+| `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express; determina la IP del cliente para el rate limiting y los logs. Render: `1`. |
 | `SERVICE_NAME` | No | `api-gateway` | Nombre del servicio en logs y métricas. |
 | `SERVICE_VERSION` | No | `1.0.0` | Versión que informan `/status` y `/api/v1/system/health`. |
 | `TRACE_ENABLED` | No | activado | `false` desactiva la copia en Redis Streams de los logs que llevan `matchId`. |
