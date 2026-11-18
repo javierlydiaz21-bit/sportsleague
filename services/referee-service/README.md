@@ -221,7 +221,7 @@ solo entre servicios (el gateway responde `404` a `/api/v1/internal/*`).
 | GET | `/api/v1/internal/assignments/check` | Interno | `?matchId=&email=` → `{ assigned, refereeName }`. Lo usa el Live Score Service para autorizar al árbitro. |
 | GET | `/health` | Abierto | Salud del servicio (base de datos y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria, checks y canales suscritos; lo consulta el panel *Sistema* del gateway. |
-| GET | `/metrics` | Abierto | Métricas Prometheus, incluida `referee_assignments_total` (por resultado y modo automático o manual). |
+| GET | `/metrics` | Abierto (con `METRICS_TOKEN`, exige ese Bearer) | Métricas Prometheus, incluida `referee_assignments_total` (por resultado y modo automático o manual). |
 | GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
 | GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
@@ -306,6 +306,7 @@ del archivo.
 | `REFEREE_MATCH_MINUTES` | No | `120` | Minutos que un partido bloquea la agenda del árbitro (para la disponibilidad y los cruces). |
 | `LEAGUE_UTC_OFFSET` | No | `-05:00` | Diferencia horaria de la liga respecto a UTC, para comparar la hora del partido con la disponibilidad declarada en hora local. |
 | `LOG_LEVEL` | No | `info` | Nivel mínimo de log: `debug`, `info`, `warn` o `error`. |
+| `METRICS_TOKEN` | No | — | Si existe, `/metrics` exige `Authorization: Bearer <METRICS_TOKEN>` (recolección desde Grafana Cloud). Sin ella, `/metrics` queda abierto, como en local. |
 | `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express (de qué proxies se acepta `X-Forwarded-For`). |
 | `SERVICE_NAME` | No | `referee-service` | Nombre del servicio en logs, métricas y en el campo `source` de los eventos. |
 | `SERVICE_VERSION` | No | `1.0.0` | Versión que informa `/status`. |

@@ -32,6 +32,8 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions) {
     for (const header of TRUSTED_HEADERS) delete req.headers[header];
 
     const path = req.path;
+    // /metrics valida su propio token (METRICS_TOKEN, en el chassis): su Bearer no es un JWT.
+    if (path === '/metrics') return next();
     if (isBlocked(path)) return reject(res, 404, 'Recurso no encontrado');
 
     let user: AuthUser | undefined;

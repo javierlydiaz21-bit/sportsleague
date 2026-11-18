@@ -216,7 +216,7 @@ entre paréntesis, la comprobación adicional del servicio.
 | POST | `/api/v1/statistics/recalculate` | Sesión (organizador de la liga o `ADMIN`) | Recalcula la tabla de una categoría (`seasonId`, `categoryId`). Con `reconcile: true` primero trae del Live Score las actas que falten o estén desactualizadas. Devuelve `{ reconciled, standings }` y publica `standings.updated`. |
 | GET | `/health` | Abierto | Salud del servicio (base de datos y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria, checks, circuitos (League y Live Score) y suscripciones; lo consulta el panel *Sistema* del gateway. |
-| GET | `/metrics` | Abierto | Métricas Prometheus, incluidas `standings_recalculations_total`, `standings_recalculation_duration_seconds`, `standings_cache_requests_total` y `live_events_observed_total`. |
+| GET | `/metrics` | Abierto (con `METRICS_TOKEN`, exige ese Bearer) | Métricas Prometheus, incluidas `standings_recalculations_total`, `standings_recalculation_duration_seconds`, `standings_cache_requests_total` y `live_events_observed_total`. |
 | GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
 | GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
@@ -315,6 +315,7 @@ del archivo.
 | `LEAGUE_SERVICE_URL` | No | `http://localhost:4002` | URL del League Service (acepta `http://host:puerto` o solo `host:puerto`). Docker Compose: `http://league-service:4002`. |
 | `LIVE_SCORE_SERVICE_URL` | No | `http://localhost:4006` | URL del Live Score Service. Docker Compose: `http://live-score-service:4006`. |
 | `LOG_LEVEL` | No | `info` | Nivel mínimo de log: `debug`, `info`, `warn` o `error`. |
+| `METRICS_TOKEN` | No | — | Si existe, `/metrics` exige `Authorization: Bearer <METRICS_TOKEN>` (recolección desde Grafana Cloud). Sin ella, `/metrics` queda abierto, como en local. |
 | `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express (de qué proxies se acepta `X-Forwarded-For`). |
 | `SERVICE_NAME` | No | `statistics-service` | Nombre del servicio en logs, métricas y en el campo `source` de los eventos. |
 | `SERVICE_VERSION` | No | `1.0.0` | Versión que informa `/status`. |

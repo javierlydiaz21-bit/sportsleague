@@ -222,7 +222,7 @@ esos roles (`@Roles`).
 | PUT | `/api/v1/players/:id/eligibility` | Sesión (organizador o `ADMIN`) | Revalida la elegibilidad. Con `status` (solo `ADMIN`) la fija a mano, con una `note` opcional. |
 | GET | `/health` | Abierto | Salud del servicio (base de datos y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria, checks, circuitos (incluido el del League Service) y suscripciones; lo consulta el panel *Sistema* del gateway. |
-| GET | `/metrics` | Abierto | Métricas Prometheus (HTTP, llamadas al League Service y estado de su circuit breaker). |
+| GET | `/metrics` | Abierto (con `METRICS_TOKEN`, exige ese Bearer) | Métricas Prometheus (HTTP, llamadas al League Service y estado de su circuit breaker). |
 | GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
 | GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
@@ -301,6 +301,7 @@ del archivo.
 | `INTERNAL_API_TOKEN` | Sí | — | Token compartido con el gateway y los demás servicios; también se envía en las llamadas al League Service. Sin él, todas las rutas salvo `/health` y `/metrics` responden `401`. |
 | `LEAGUE_SERVICE_URL` | No | `http://localhost:4002` | URL del League Service (acepta `http://host:puerto` o solo `host:puerto`). Docker Compose: `http://league-service:4002`; Render: `https://sportsleague-jd-league.onrender.com`. |
 | `LOG_LEVEL` | No | `info` | Nivel mínimo de log: `debug`, `info`, `warn` o `error`. |
+| `METRICS_TOKEN` | No | — | Si existe, `/metrics` exige `Authorization: Bearer <METRICS_TOKEN>` (recolección desde Grafana Cloud). Sin ella, `/metrics` queda abierto, como en local. |
 | `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express (de qué proxies se acepta `X-Forwarded-For`). |
 | `SERVICE_NAME` | No | `team-service` | Nombre del servicio en logs, métricas y en el campo `source` de los eventos. |
 | `SERVICE_VERSION` | No | `1.0.0` | Versión que informa `/status`. |

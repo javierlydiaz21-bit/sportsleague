@@ -273,7 +273,7 @@ entre paréntesis, la comprobación adicional del servicio. *Rol* = solo esos ro
 | DELETE | `/api/v1/subscriptions/:leagueId` | Sesión | Deja de seguir la liga. |
 | GET | `/health` | Abierto | Salud del servicio (base de datos y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria, checks, circuitos (Team) y canales suscritos; lo consulta el panel *Sistema* del gateway. |
-| GET | `/metrics` | Abierto | Métricas Prometheus, incluidas `notifications_created_total{type}` y `notification_deliveries_total{channel,status}`. |
+| GET | `/metrics` | Abierto (con `METRICS_TOKEN`, exige ese Bearer) | Métricas Prometheus, incluidas `notifications_created_total{type}` y `notification_deliveries_total{channel,status}`. |
 | GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
 | GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
@@ -375,6 +375,7 @@ del archivo.
 | `VAPID_SUBJECT` | No | `mailto:admin@sportsleague.com` | Contacto que se envía a los servicios push (formato `mailto:` o `https:`). |
 | `LEAGUE_TIMEZONE` | No | `America/Bogota` | Zona horaria con la que las plantillas muestran la fecha y hora de los partidos. |
 | `LOG_LEVEL` | No | `info` | Nivel mínimo de log: `debug`, `info`, `warn` o `error`. |
+| `METRICS_TOKEN` | No | — | Si existe, `/metrics` exige `Authorization: Bearer <METRICS_TOKEN>` (recolección desde Grafana Cloud). Sin ella, `/metrics` queda abierto, como en local. |
 | `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express (de qué proxies se acepta `X-Forwarded-For`). |
 | `SERVICE_NAME` | No | `notification-service` | Nombre del servicio en logs y métricas. |
 | `SERVICE_VERSION` | No | `1.0.0` | Versión que informa `/status`. |

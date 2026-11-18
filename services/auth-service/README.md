@@ -217,7 +217,7 @@ Se consumen a través del API Gateway (`http://localhost:4000`). Todas las rutas
 | PATCH | `/api/v1/users/:id` | Rol `ADMIN` | Cambia el `role` o el `status` (`ACTIVE` / `SUSPENDED`) de otra cuenta. Publica `user.updated`. |
 | GET | `/health` | Abierto | Salud del servicio (base de datos y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria, checks, circuitos y suscripciones; lo consulta el panel *Sistema* del gateway. |
-| GET | `/metrics` | Abierto | Métricas Prometheus (HTTP, eventos publicados y consumidos). |
+| GET | `/metrics` | Abierto (con `METRICS_TOKEN`, exige ese Bearer) | Métricas Prometheus (HTTP, eventos publicados y consumidos). |
 | GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
 | GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
@@ -303,6 +303,7 @@ del archivo.
 | `COOKIE_SECURE` | No | `false` | `true` marca la cookie `sl_refresh` como `Secure` (obligatorio con HTTPS, como en Render). |
 | `COOKIE_SAMESITE` | No | `lax` | `SameSite` de la cookie. En Render es `none` porque la web (Vercel) y la API (onrender.com) están en dominios distintos. |
 | `LOG_LEVEL` | No | `info` | Nivel mínimo de log: `debug`, `info`, `warn` o `error`. |
+| `METRICS_TOKEN` | No | — | Si existe, `/metrics` exige `Authorization: Bearer <METRICS_TOKEN>` (recolección desde Grafana Cloud). Sin ella, `/metrics` queda abierto, como en local. |
 | `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express (de qué proxies se acepta `X-Forwarded-For`). |
 | `SERVICE_NAME` | No | `auth-service` | Nombre del servicio en logs, métricas y en el campo `source` de los eventos. |
 | `SERVICE_VERSION` | No | `1.0.0` | Versión que informa `/status`. |
