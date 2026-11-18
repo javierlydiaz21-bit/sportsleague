@@ -102,6 +102,9 @@ construcción tardó ≈11 minutos y el arranque completo con la demo ≈15; los
 
 ### Recorrido sugerido para la demostración
 
+En producción, despierta antes los servicios con `scripts/despertar.ps1`
+(ver [Antes de una demostración](#antes-de-una-demostración)).
+
 1. Entra como **organizadora@demo.com** → *Mis ligas* → crea una liga: queda **pendiente**.
 2. Entra como **admin** → *Administración → Ligas*: apruébala. La organizadora recibe la notificación.
 3. Como organizadora configura temporada, categoría, canchas, equipos (prueba un jugador
@@ -319,7 +322,7 @@ frontend/                Next.js 15 + TypeScript + Tailwind CSS 4
 mobile/                  app React Native (Expo) para árbitros y espectadores
 infra/                   PostgreSQL (una base por servicio), Prometheus, Grafana
 load-tests/              k6: varias jornadas en simultáneo contra Live Score
-scripts/                 seed-demo.mjs, sync-chassis.mjs
+scripts/                 seed-demo.mjs, sync-chassis.mjs, despertar.ps1
 .github/workflows/       un pipeline por servicio + pipeline reutilizable + frontend
 render.yaml              blueprint de despliegue en Render (referencia, planes de pago)
 render-free.yaml         variante gratuita (Render Free) para demostraciones
@@ -547,7 +550,31 @@ Límites del plan gratuito:
 - En Safari, la sesión no sobrevive a una recarga de la página: bloquea la cookie de sesión
   (otro dominio, `onrender.com`) y hay que volver a iniciar sesión.
 - Render Free **bloquea los puertos SMTP** (25, 465 y 587) desde septiembre de 2025: por eso el
-  correo sale por HTTPS a través de Google Apps Script (sección siguiente).
+  correo sale por HTTPS a través de Google Apps Script (ver [Correo real con Gmail](#correo-real-con-gmail)).
+
+### Antes de una demostración
+
+Los servicios de Render Free se duermen tras 15 minutos sin tráfico y, mientras despiertan,
+pueden responder con error durante un rato. Unos minutos antes de una demostración o de tomar
+capturas, despiértalos desde Windows (no necesita Docker ni Node):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\despertar.ps1
+```
+
+El script llama a la vez al `/health` de los 10 servicios, que comprueba su base de datos y Redis,
+y a la página principal de la web, que no tiene `/health`. Repite cada 5 s hasta que todos
+respondan 200 y muestra cuánto tardó cada uno. Espera como máximo 5 minutos (`-MaxMinutos 10`
+para esperar más) y termina con código 1 si alguno no respondió. Cada servicio vuelve a dormirse
+15 minutos después de la última petición y el tiempo despierto gasta horas del plan gratuito.
+
+Si un servicio no despierta:
+
+| Resultado | Qué hacer |
+|---|---|
+| `HTTP 503` | El servicio arrancó, pero no llega a su base o a Redis. Si la base venció, sigue los pasos de [Despliegue gratuito](#despliegue-gratuito-render-free--vercel-hobby) |
+| `HTTP 502 (x-render-routing: no-deploy)` | La instancia no arrancó. Mira https://status.render.com: si hay un incidente, espera o usa la demo local (Docker). Si no lo hay, Render → el servicio → *Manual Deploy* → *Deploy latest reference* |
+| `sin respuesta en 70 s` | Vuelve a correr el script: el primer arranque puede tardar más de un minuto |
 
 ### Correo real con Gmail
 
