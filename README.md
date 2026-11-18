@@ -331,7 +331,9 @@ detener.bat              detiene los contenedores conservando los datos
 
 ## Pruebas
 
-Cada servicio tiene pruebas unitarias e integración HTTP con Jest (155 pruebas en total), por ejemplo:
+Cada servicio tiene pruebas unitarias y de integración (HTTP y contra PostgreSQL real) con Jest:
+343 en total. El detalle por servicio, con la cobertura, está en
+[EVIDENCIAS_PRUEBAS.md](EVIDENCIAS_PRUEBAS.md). Por ejemplo:
 
 - Fixture: propiedades del round-robin (cada par se enfrenta una vez, localía equilibrada ±1,
   nadie juega dos veces por jornada) y del calendario (descanso mínimo, canchas y horarios).
@@ -620,4 +622,7 @@ debe volver a pulsar *Activar*. Sin claves, el push queda como `SIMULATED`.
 - **Réplicas de lectura en local**: se simulan con el usuario de solo lectura `analytics_ro`;
   con planes de pago (`render.yaml`) se apuntan réplicas reales (`*_REPLICA_URL`). En Render Free
   no hay réplicas ni usuarios por servicio: Analytics lee por su nombre las bases de Fixture, Live
-  Score y Statistics de la misma instancia, siempre en transacciones de solo lectura.
+  Score y Statistics de la misma instancia con el usuario de la instancia. Abre esas conexiones en
+  modo de solo lectura (`default_transaction_read_only=on`), y cualquier escritura falla. Es una
+  opción de la sesión, no un usuario con permisos restringidos (ver ANA-01 en
+  `MATRIZ_CUMPLIMIENTO.md`).
