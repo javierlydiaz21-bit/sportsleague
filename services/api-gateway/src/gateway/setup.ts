@@ -1,11 +1,21 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
-import { RedisService, env, envInt, envList } from '../chassis';
+import { RedisService, env, envInt, envList, type OpenApiOptions } from '../chassis';
 import { createAuthMiddleware, rejectUnknownOrigins } from './auth.middleware';
 import { createProxyDispatcher } from './proxy';
 import { createRateLimiter, limitsFromEnv } from './rate-limit.middleware';
 import { serviceUrls } from './routes';
 import { createWakeMiddleware } from './wake';
+
+/** /docs del gateway: sus rutas propias, con el esquema Bearer para probarlas con un JWT. */
+export const GATEWAY_OPENAPI: Pick<OpenApiOptions, 'description' | 'bearer'> = {
+  bearer: true,
+  description:
+    'Punto de entrada único de SportsLeague. Aquí están las rutas propias del gateway; el resto de `/api/v1` ' +
+    'se reenvía a cada microservicio, que documenta las suyas en su propio `/docs`. Para probar las rutas de ' +
+    'administración, inicia sesión con `POST /api/v1/auth/login` (`"client": "mobile"` devuelve el ' +
+    '`accessToken` en el cuerpo), pulsa «Authorize» y pega ese token.',
+};
 
 /**
  * Cadena del gateway sobre la aplicación ya configurada con configureApp: cabeceras de seguridad,

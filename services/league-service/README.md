@@ -228,6 +228,8 @@ roles (`@Roles`). *Interno* = solo entre servicios (el gateway responde `404` a 
 | GET | `/health` | Abierto | Salud del servicio (base de datos y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria, checks, circuitos y suscripciones; lo consulta el panel *Sistema* del gateway. |
 | GET | `/metrics` | Abierto | Métricas Prometheus (HTTP, eventos publicados). |
+| GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
+| GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
 En el gateway, `PATCH /api/v1/leagues/:id/review` y `GET /api/v1/leagues/stats` también están
 restringidas a `ADMIN`. Las rutas `/api/v1/seasons/:id/fixtures/*` no llegan a este servicio: el gateway

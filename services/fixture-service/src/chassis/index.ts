@@ -9,6 +9,7 @@ export * from './health';
 export * from './http-observability';
 export * from './logger';
 export * from './metrics';
+export * from './openapi';
 export * from './redis.service';
 export * from './request-context';
 export * from './service-client';

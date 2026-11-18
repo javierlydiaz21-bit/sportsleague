@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { AppModule } from './app.module';
 import { bootstrapService } from './chassis';
-import { configureGateway } from './gateway/setup';
+import { GATEWAY_OPENAPI, configureGateway } from './gateway/setup';
 
 void bootstrapService(AppModule, {
   name: 'api-gateway',
@@ -10,4 +10,5 @@ void bootstrapService(AppModule, {
   bodyParser: false,
   routeFromPath: true,
   configure: (app) => configureGateway(app),
+  openapi: GATEWAY_OPENAPI,
 });

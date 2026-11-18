@@ -229,6 +229,8 @@ entre paréntesis, la comprobación adicional del servicio.
 | GET | `/health` | Abierto | Salud del servicio (base de datos y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria, checks, circuitos (Fixture, Referee y Team) y suscripciones; lo consulta el panel *Sistema* del gateway. |
 | GET | `/metrics` | Abierto | Métricas Prometheus, incluidas `match_events_registered_total{type,league_id,season_id,category_id}`, `live_score_update_latency_seconds`, `live_ws_connections` y `live_viewers_total`. |
+| GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
+| GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
 En el gateway, `/api/v1/matches/:id/events`, `/live`, `/start` y `/complete` y todo `/api/v1/live/*` se
 envían a este servicio; el resto de `/api/v1/matches/*` va al Fixture Service.
