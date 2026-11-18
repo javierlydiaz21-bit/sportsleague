@@ -385,11 +385,15 @@ del archivo.
 
 ## Despliegue
 
-- **Imagen Docker**: `ghcr.io/javierlydiaz21-bit/sportsleague-app-notification-service`, publicada por
-  GitHub Actions desde el repositorio principal (`.github/workflows/notification-service.yml`, que llama a
-  `service-pipeline.yml`): `npm ci` → ESLint → Jest con cobertura → `npm run build` → imagen en GHCR con
-  las etiquetas `:<sha>` y `:latest` (rama `main`) o `:develop` → despliegue en Render con el *deploy hook*
-  del secreto `RENDER_DEPLOY_HOOK_NOTIFICATION`.
+- **Despliegue continuo** (`.github/workflows/deploy.yml` de este repositorio): en cada push a `main`
+  (el merge de un Pull Request) corre el CI (`ci-servicio.yml@v1`: ESLint, Jest con PostgreSQL y
+  cobertura, build y gitleaks) y, **solo si pasa**, publica la imagen
+  `ghcr.io/javierlydiaz21-bit/sportsleague-app-notification-service` con las etiquetas `:<sha>` y `:latest` y la
+  despliega en Render con el *deploy hook* del secreto `RENDER_DEPLOY_HOOK`. Si el secreto falta, el
+  despliegue falla. `ci.yml` prueba los Pull Requests y la rama `develop`.
+- **Requisitos en GitHub**: el secreto `RENDER_DEPLOY_HOOK` (Render → servicio → *Settings* → *Deploy
+  Hook*) y el rol *Write* de este repositorio sobre el paquete `sportsleague-app-notification-service`
+  (*Package settings* → *Manage Actions access*).
 - **Render Free** (blueprint `render-free.yaml`): https://sportsleague-jd-notification.onrender.com. Usa
   la PostgreSQL gratuita compartida `sportsleague-jd-db` con su propia base (`DATABASE_NAME`) y el Key
   Value `sportsleague-jd-redis`. `MAIL_RELAY_URL` y `MAIL_RELAY_SECRET` se escriben en el panel de Render

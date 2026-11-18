@@ -19,7 +19,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: live-score-service-${{ github.ref }}
@@ -31,5 +30,3 @@ jobs:
     with:
       service: live-score-service
       load-test: true
-    secrets:
-      RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_LIVE_SCORE }}

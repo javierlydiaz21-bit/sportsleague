@@ -41,9 +41,13 @@ microservicios independientes. El README.md documenta todo; aquí van solo la es
   `service-pipeline.yml` y los 10 repos de servicio con `@v1`. Tras cambiarlo, mueve la etiqueta `v1`
   si el cambio es compatible (o crea `v2`). Las acciones van fijadas por SHA con su versión en un
   comentario; actualiza ambos a la vez.
+  Despliegue: lo hace el `deploy.yml` de cada repo de servicio (`services/<servicio>/.github/workflows/`)
+  en cada push a su `main`: CI → imagen → deploy hook (secreto `RENDER_DEPLOY_HOOK` de ese repo, que
+  además tiene rol Write sobre su paquete). El repo principal solo prueba: no publica ni despliega.
+  Un merge a `main` de un repo de servicio despliega producción: pide confirmación antes.
   Repositorio: github.com/javierlydiaz21-bit/sportsleague. Imágenes:
   `ghcr.io/javierlydiaz21-bit/sportsleague-app-<servicio>`. No uses `sportsleague-<servicio>`:
-  esos paquetes son del proyecto anterior (`sportsleague-ms`) y este repo no puede escribir en ellos.
+  esos paquetes son del proyecto anterior (`sportsleague-ms`) y no hay permiso de escritura en ellos.
   El usuario no paga servicios: el despliegue usa `render-free.yaml` (Render Free) y Vercel Hobby;
   `render.yaml` (de pago) queda como referencia. No propongas servicios de pago.
   Producción: web https://sportsleague-cyan.vercel.app, gateway

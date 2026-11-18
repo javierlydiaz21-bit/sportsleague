@@ -1,12 +1,12 @@
 # CI del repositorio independiente de referee-service. No copia los pasos: usa el workflow compartido
-# ci-servicio.yml del repositorio principal (javierlydiaz21-bit/sportsleague) en su versión v1,
-# el mismo que se ejecuta allí antes de publicar la imagen que despliega Render.
+# ci-servicio.yml del repositorio principal (javierlydiaz21-bit/sportsleague) en su versión v1.
 # Jobs: «Lint, pruebas y build», «Escaneo de secretos» (gitleaks) e «Imagen Docker».
+# En main no corre en push: allí lo ejecuta deploy.yml antes de desplegar.
 name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [develop]
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
