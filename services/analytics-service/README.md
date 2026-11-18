@@ -224,7 +224,7 @@ entre paréntesis, la comprobación adicional del servicio. *Rol* = solo esos ro
 | GET | `/api/v1/analytics/etl/runs` | Rol `ADMIN` | Últimas 30 corridas del ETL. |
 | GET | `/health` | Abierto | Salud del servicio (base de datos propia y Redis). La usan Docker y Render. |
 | GET | `/status` | Interno | Versión, tiempo activo, memoria y checks; lo consulta el panel *Sistema* del gateway. |
-| GET | `/metrics` | Abierto | Métricas Prometheus, incluidas `etl_runs_total{status}` y `etl_duration_seconds`. |
+| GET | `/metrics` | Abierto (con `METRICS_TOKEN`, exige ese Bearer) | Métricas Prometheus, incluidas `etl_runs_total{status}` y `etl_duration_seconds`. |
 | GET | `/docs` | Abierto | Documentación de la API (Swagger UI, generada con `@nestjs/swagger`). Solo de consulta: las rutas se prueban a través del API Gateway. |
 | GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 
@@ -304,6 +304,7 @@ del archivo.
 | `REDIS_URL` | No | `redis://localhost:6379` | Redis para el candado del ETL y las trazas. Docker Compose: `redis://redis:6379`. |
 | `INTERNAL_API_TOKEN` | Sí | — | Token compartido con el gateway y los demás servicios. Sin él, todas las rutas salvo `/health` y `/metrics` responden `401`. |
 | `LOG_LEVEL` | No | `info` | Nivel mínimo de log: `debug`, `info`, `warn` o `error`. |
+| `METRICS_TOKEN` | No | — | Si existe, `/metrics` exige `Authorization: Bearer <METRICS_TOKEN>` (recolección desde Grafana Cloud). Sin ella, `/metrics` queda abierto, como en local. |
 | `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express (de qué proxies se acepta `X-Forwarded-For`). |
 | `SERVICE_NAME` | No | `analytics-service` | Nombre del servicio en logs y métricas. |
 | `SERVICE_VERSION` | No | `1.0.0` | Versión que informa `/status`. |

@@ -211,7 +211,7 @@ middleware del gateway).
 |---|---|---|---|
 | GET | `/health` | Abierto | Salud del gateway (Redis). `200` o `503`. |
 | GET | `/status` | Rol `ADMIN` | Versión, tiempo activo, memoria y checks del gateway. |
-| GET | `/metrics` | Abierto | Métricas Prometheus (HTTP, solicitudes y latencia por servicio destino, rechazos por rate limiting). |
+| GET | `/metrics` | Abierto (con `METRICS_TOKEN`, exige ese Bearer) | Métricas Prometheus (HTTP, solicitudes y latencia por servicio destino, rechazos por rate limiting). |
 | GET | `/docs` | Abierto | Documentación de la API del gateway (Swagger UI, generada con `@nestjs/swagger`). Con «Authorize» y el `accessToken` de un administrador se prueban las rutas de `/api/v1/system`. |
 | GET | `/openapi.json` | Abierto | La misma documentación en formato OpenAPI 3 (JSON). |
 | GET | `/api/v1/system/health` | Rol `ADMIN` | Salud agregada: consulta `/status` de los 9 servicios (con el token interno y timeout de 2,5 s), Redis y el número de suscriptores de cada canal de eventos (`PUBSUB NUMSUB`). Estado general `ok`, `degraded` o `down`. |
@@ -354,6 +354,7 @@ migraciones. Solo usa Redis:
 | `WAKE_SERVICES` | No | `false` | `true` activa el despertador de servicios (solo en Render Free). |
 | `WAKE_INTERVAL_MS` | No | `240000` | Intervalo mínimo entre dos rondas del despertador (4 minutos). |
 | `LOG_LEVEL` | No | `info` | Nivel mínimo de log: `debug`, `info`, `warn` o `error`. |
+| `METRICS_TOKEN` | No | — | Si existe, `/metrics` exige `Authorization: Bearer <METRICS_TOKEN>` (recolección desde Grafana Cloud). Sin ella, `/metrics` queda abierto, como en local. |
 | `TRUST_PROXY` | No | `loopback, linklocal, uniquelocal` | Valor de `trust proxy` de Express; determina la IP del cliente para el rate limiting. Render: `1`. |
 | `SERVICE_NAME` | No | `api-gateway` | Nombre del servicio en logs y métricas. |
 | `SERVICE_VERSION` | No | `1.0.0` | Versión que informan `/status` y `/api/v1/system/health`. |

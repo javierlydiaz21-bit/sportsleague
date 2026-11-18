@@ -251,6 +251,18 @@ describe('API Gateway · integración (cadena completa frente a los microservici
     expect(page.text).toContain('swagger-ui');
   });
 
+  it('con METRICS_TOKEN, /metrics del gateway acepta ese Bearer (no lo trata como JWT) y rechaza al resto', async () => {
+    process.env.METRICS_TOKEN = 'secreto-de-metricas';
+    try {
+      await http().get('/metrics').expect(401);
+      await http().get('/metrics').set(ADMIN).expect(401); // un JWT válido no sirve como METRICS_TOKEN
+      const res = await http().get('/metrics').set('Authorization', 'Bearer secreto-de-metricas').expect(200);
+      expect(res.text).toContain('http_requests_total');
+    } finally {
+      delete process.env.METRICS_TOKEN;
+    }
+  });
+
   it('/metrics cuenta peticiones por ruta, reenvíos por microservicio y rechazos por rate limiting', async () => {
     const res = await http().get('/metrics').expect(200);
     expect(res.text).toContain(`http_requests_total{method="GET",route="/api/v1/matches/:id/live",status="200"} 1`);
