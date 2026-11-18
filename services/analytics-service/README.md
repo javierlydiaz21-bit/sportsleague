@@ -1,7 +1,7 @@
 # Analytics Service · SportsLeague
 
 Microservicio de analítica de **SportsLeague**, la plataforma de gestión de ligas deportivas amateur
-(fútbol, básquet y vóley). Ejecuta un ETL periódico que lee, con un usuario de solo lectura, las bases de
+(fútbol, básquet y vóley). Ejecuta un ETL periódico que lee, en conexiones de solo lectura, las bases de
 Fixture, Live Score y Statistics (simulando las réplicas de lectura del documento de arquitectura) y
 guarda en su propia base indicadores listos para consultar: asistencia estimada, partidos suspendidos,
 tendencia de rendimiento de los equipos y KPIs por liga.
@@ -32,9 +32,13 @@ tendencia de rendimiento de los equipos y KPIs por liga.
 **Qué no hace**
 
 - No consume eventos ni llama por REST a otros servicios.
-- Nunca escribe en las bases operativas: el usuario `analytics_ro` solo tiene permiso `SELECT` y
-  `default_transaction_read_only = on`; cada réplica usa un pool de 2 conexiones con `statement_timeout`
-  de 15 s.
+- Nunca escribe en las bases operativas. Abre cada conexión a ellas con
+  `default_transaction_read_only=on` (`withReadOnlyTransactions` en `replica-url.ts`), así que
+  cualquier escritura falla.
+  - Es una opción de la sesión, no un usuario con permisos restringidos.
+  - En local, el usuario `analytics_ro` además solo tiene permiso `SELECT`.
+  - En Render Free se usa el usuario de la instancia, que sí podría desactivar esa opción.
+- Cada réplica usa un pool de 2 conexiones con `statement_timeout` de 15 s.
 
 **Por qué es un servicio aparte**: las consultas analíticas son pesadas y no deben competir con la
 operación diaria. Por eso leen réplicas de solo lectura (en local, el usuario `analytics_ro`) y guardan
@@ -188,10 +192,10 @@ Las pruebas desactivan el ETL programado (`ETL_DISABLED=true`) y lo ejecutan a m
 | Tipo | Archivo | Qué prueba | Qué se simula |
 |---|---|---|---|
 | Unitaria | `src/etl/transform.spec.ts` | Transformaciones: asistencia con acta o pico en línea, suspendidos, KPIs y tendencia acumulada | Nada (funciones puras) |
-| Unitaria | `src/etl/replica-url.spec.ts` | Resolución de las URL de las réplicas | Nada (funciones puras) |
-| Unitaria | `src/etl/etl.service.spec.ts` | Corrida completa en una transacción (`SUCCESS`), réplica caída (`FAILED` sin tocar las tablas) y candado de Redis entre instancias | Las réplicas (`pg.Pool`), Prisma y Redis (`jest.fn()`) |
+| Unitaria | `src/etl/replica-url.spec.ts` | Resolución de las URL de las réplicas y opción de solo lectura (sin perder las demás opciones) | Nada (funciones puras) |
+| Unitaria | `src/etl/etl.service.spec.ts` | Las tres conexiones se abren en solo lectura; corrida completa en una transacción (`SUCCESS`); réplica caída (`FAILED` sin tocar las tablas); candado de Redis entre instancias | Las réplicas (`pg.Pool`), Prisma y Redis (`jest.fn()`) |
 | Integración HTTP | `test/analytics.e2e.spec.ts` | Resumen global solo para `ADMIN` y analítica de liga solo para su organizador | Prisma, Redis y el bus de eventos |
-| Integración con PostgreSQL | `test/integration/analytics.integration.spec.ts` | ETL real sobre tres réplicas (esquemas con las tablas que lee y datos conocidos) conectadas en solo lectura → KPIs, asistencia estimada, suspendidos y tendencia por HTTP; segunda corrida sin duplicar; réplica rota (`FAILED`, se conserva la analítica anterior); 403 de otro organizador y de un aficionado; `/metrics` | Solo Redis (candado del ETL) |
+| Integración con PostgreSQL | `test/integration/analytics.integration.spec.ts` | ETL real sobre tres réplicas (esquemas con las tablas que lee y datos conocidos) conectadas en solo lectura (una escritura por esa conexión falla) → KPIs, asistencia estimada, suspendidos y tendencia por HTTP; segunda corrida sin duplicar; réplica rota (`FAILED`, se conserva la analítica anterior); 403 de otro organizador y de un aficionado; `/metrics` | Solo Redis (candado del ETL) |
 
 La prueba de integración con PostgreSQL usa `TEST_DATABASE_URL`. Por defecto es la PostgreSQL de Docker
 Compose del repositorio principal (`docker compose up -d postgres`):
