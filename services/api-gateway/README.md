@@ -365,11 +365,15 @@ gateway no las usa. No necesita `DATABASE_URL` ni `DATABASE_NAME`.
 
 ## Despliegue
 
-- **Imagen Docker**: `ghcr.io/javierlydiaz21-bit/sportsleague-app-api-gateway`, publicada por GitHub
-  Actions desde el repositorio principal (`.github/workflows/api-gateway.yml`, que llama a
-  `service-pipeline.yml`): `npm ci` → ESLint → Jest con cobertura → `npm run build` → imagen en GHCR con
-  las etiquetas `:<sha>` y `:latest` (rama `main`) o `:develop` → despliegue en Render con el *deploy hook*
-  del secreto `RENDER_DEPLOY_HOOK_GATEWAY`.
+- **Despliegue continuo** (`.github/workflows/deploy.yml` de este repositorio): en cada push a `main`
+  (el merge de un Pull Request) corre el CI (`ci-servicio.yml@v1`: ESLint, Jest con cobertura, build
+  y gitleaks) y, **solo si pasa**, publica la imagen
+  `ghcr.io/javierlydiaz21-bit/sportsleague-app-api-gateway` con las etiquetas `:<sha>` y `:latest` y la
+  despliega en Render con el *deploy hook* del secreto `RENDER_DEPLOY_HOOK`. Si el secreto falta, el
+  despliegue falla. `ci.yml` prueba los Pull Requests y la rama `develop`.
+- **Requisitos en GitHub**: el secreto `RENDER_DEPLOY_HOOK` (Render → servicio → *Settings* → *Deploy
+  Hook*) y el rol *Write* de este repositorio sobre el paquete `sportsleague-app-api-gateway`
+  (*Package settings* → *Manage Actions access*).
 - **Render Free** (blueprint `render-free.yaml`): https://sportsleague-jd-gateway.onrender.com. Es la URL
   que usa la web publicada en https://sportsleague-cyan.vercel.app (`NEXT_PUBLIC_API_URL` y
   `API_INTERNAL_URL` en Vercel). Allí se configuran `WAKE_SERVICES=true`, `PROXY_TIMEOUT_MS=60000`,
