@@ -583,4 +583,6 @@ debe volver a pulsar *Activar*. Sin claves, el push queda como `SIMULATED`.
 - **Réplicas de lectura en local**: se simulan con el usuario de solo lectura `analytics_ro`;
   con planes de pago (`render.yaml`) se apuntan réplicas reales (`*_REPLICA_URL`). En Render Free
   no hay réplicas ni usuarios por servicio: Analytics lee por su nombre las bases de Fixture, Live
-  Score y Statistics de la misma instancia, siempre en transacciones de solo lectura.
+  Score y Statistics de la misma instancia, con el usuario de la instancia, que no es de solo
+  lectura. El ETL solo ejecuta consultas `SELECT`, pero en producción nada lo impone a nivel de base
+  de datos (ver ANA-01 en `MATRIZ_CUMPLIMIENTO.md`).

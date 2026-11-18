@@ -38,13 +38,16 @@ El detalle está en [EVIDENCIAS_PRUEBAS.md](EVIDENCIAS_PRUEBAS.md).
 | Live Score | 7 | 7 | 100 % | WebSocket (Socket.IO), actas versionadas, eventos `match.*` |
 | Statistics | 6 | 6 | 100 % | Recálculo idempotente por eventos, desempates, caché de la tabla en Redis |
 | Notification | 8 | 8 | 100 % | Correo real (Gmail vía Google Apps Script), push del navegador (Web Push con VAPID), consumidor de 9 eventos |
-| Analytics | 4 | 4 | 100 % | ETL periódico sobre réplicas de solo lectura, KPIs |
+| Analytics | 4 | 4 (1 con desviación justificada) | 100 % | ETL periódico de solo consultas sobre las bases de Fixture, Live Score y Statistics (en local, con un usuario de solo lectura), KPIs |
 | Auth | 6 | 6 | 100 % | JWT, refresh tokens rotativos, bcrypt, CSRF, roles |
 | API Gateway | 7 | 6 | 86 % | Proxy inverso, JWT, rate limiting en Redis, CORS, trazas por `match_id` |
 | **Total** | **66** | **65** | **98,5 %** | — |
 
 El único requerimiento sin cumplir es **GW-04**. El gateway registra cada petición, pero no guarda la
 IP del cliente.
+
+**ANA-01** cuenta como cumplido con una desviación justificada: en producción no hay réplicas de solo
+lectura. La explicación está en la sección de Analytics.
 
 ## Team Service
 
@@ -158,14 +161,29 @@ Momento 1, §2.8.
 
 | ID | Requerimiento (fuente) | Implementación | Prueba | Estado |
 |---|---|---|---|---|
-| ANA-01 | ETL periódico sobre réplicas de solo lectura de Fixture, Live Score y Statistics (§2.8) | ETL cada `ETL_INTERVAL_MINUTES` (5 por defecto) en transacciones de solo lectura; `POST /api/v1/analytics/etl/run`; pantalla *Administración → Sistema* | Unitaria: «extrae de las réplicas, carga las tablas en una sola transacción y marca la corrida SUCCESS». Integración: «el administrador ejecuta el ETL: extrae de las tres réplicas, transforma y carga la analítica» | Cumplido |
+| ANA-01 | ETL periódico sobre réplicas de solo lectura de Fixture, Live Score y Statistics (§2.8) | ETL cada `ETL_INTERVAL_MINUTES` (5 por defecto) que solo ejecuta consultas `SELECT` sobre las bases de Fixture, Live Score y Statistics; `POST /api/v1/analytics/etl/run`; pantalla *Administración → Sistema*. En producción no lee réplicas: ver la nota | Unitaria: «extrae de las réplicas, carga las tablas en una sola transacción y marca la corrida SUCCESS». Integración: «el administrador ejecuta el ETL: extrae de las tres réplicas, transforma y carga la analítica» | **Cumplido con desviación justificada** |
 | ANA-02 | Asistencia estimada por partido (§2.8) | `GET /api/v1/analytics/attendance?leagueId=`; la pantalla *Mis ligas → Analítica* la muestra con `GET /api/v1/analytics/leagues/:leagueId` | Integración: «el organizador ve la asistencia estimada (acta o pico en línea)…». Unitaria (`transform.spec.ts`) | Cumplido |
 | ANA-03 | Número de partidos suspendidos (§2.8) | `GET /api/v1/analytics/suspended-matches?leagueId=`; también en *Mis ligas → Analítica* (`GET /api/v1/analytics/leagues/:leagueId`) | Integración: «…y los partidos suspendidos de su liga». Unitaria: «lista los partidos suspendidos con su motivo» | Cumplido |
 | ANA-04 | Evolución del rendimiento de cada equipo en la temporada (§2.8) | `GET /api/v1/analytics/team-trend/:teamId`; gráfica en `/equipos/[id]` | Integración: «la tendencia del equipo acumula puntos y diferencia de gol partido a partido» | Cumplido |
 
-En Render Free no hay réplicas reales. Analytics lee las bases de Fixture, Live Score y Statistics
-de la misma instancia, siempre en transacciones de solo lectura. Así consta en «Decisiones respecto
-al documento» del README.
+**Desviación justificada en ANA-01: réplicas de solo lectura.**
+
+- **Qué pide el documento:** que el ETL lea réplicas de solo lectura de las bases operativas, para no
+  competir por recursos con ellas.
+- **Qué lee en producción:** Render Free no tiene réplicas de lectura. El plan gratuito permite una
+  sola instancia de PostgreSQL, que aloja las bases de todos los servicios. En `render-free.yaml`,
+  `FIXTURE_REPLICA_URL`, `LIVESCORE_REPLICA_URL` y `STATISTICS_REPLICA_URL` solo dan el nombre de la
+  base (`fixture_db`, `livescore_db`, `statistics_db`). Con eso, Analytics se conecta a las bases
+  operativas de la misma instancia con las credenciales de su propia `DATABASE_URL`: el usuario de la
+  instancia, el mismo que usan todos los servicios.
+- **Qué protección queda:** ese usuario **no es de solo lectura**. El ETL solo ejecuta consultas
+  `SELECT`, pero en producción nada lo impone a nivel de base de datos.
+- **Por qué:** tener réplicas, una instancia por servicio o un usuario de solo lectura por servicio
+  exige planes de pago de Render, y el despliegue del proyecto es gratuito. `render.yaml`, el blueprint
+  de pago que queda como referencia, deja `*_REPLICA_URL` para apuntar a réplicas reales.
+- **En local sí se cumple tal como dice el documento:** con Docker Compose, Analytics lee con el
+  usuario `analytics_ro`, que solo tiene permiso `SELECT` y `default_transaction_read_only = on`
+  (`infra/postgres/init/01-databases.sh`).
 
 ## Auth Service
 
