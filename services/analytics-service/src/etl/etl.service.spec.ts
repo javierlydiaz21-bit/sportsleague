@@ -1,3 +1,4 @@
+import { Pool } from 'pg';
 import { EtlService } from './etl.service';
 
 process.env.LOG_LEVEL = 'error';
@@ -58,6 +59,15 @@ describe('EtlService (ETL sobre réplicas de solo lectura)', () => {
 
   beforeEach(() => {
     replicaQuery.mockReset();
+  });
+
+  it('abre las conexiones a las bases de Fixture, Live Score y Statistics en modo de solo lectura', () => {
+    const PoolMock = Pool as unknown as jest.Mock;
+    PoolMock.mockClear();
+    setup();
+    const urls = PoolMock.mock.calls.map(([config]: [{ connectionString: string }]) => new URL(config.connectionString));
+    expect(urls.map((url) => url.pathname)).toEqual(['/fixture_db', '/livescore_db', '/statistics_db']);
+    for (const url of urls) expect(url.searchParams.get('options')).toBe('-c default_transaction_read_only=on');
   });
 
   it('extrae de las réplicas, carga las tablas en una sola transacción y marca la corrida SUCCESS', async () => {

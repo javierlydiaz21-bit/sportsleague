@@ -6,8 +6,8 @@
  * con Supertest. Todo en PostgreSQL real, en esquemas aparte por ejecución que se borran al terminar:
  * - «pruebas_<sufijo>»: la base propia de Analytics, creada con sus migraciones.
  * - ese nombre con «_fixture», «_livescore» y «_statistics»: las réplicas que lee el ETL, con las
- *   tablas y columnas que consulta y unos datos conocidos. El ETL se conecta a ellas en modo de solo
- *   lectura (default_transaction_read_only), como el usuario analytics_ro de producción.
+ *   tablas y columnas que consulta y unos datos conocidos. El propio servicio abre esas conexiones en
+ *   modo de solo lectura (default_transaction_read_only=on), igual que en producción.
  *
  * Lo único simulado es Redis (el candado del ETL). Este servicio no consume eventos ni llama a otros.
  *
@@ -19,6 +19,7 @@ import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
+import { EtlService } from '../../src/etl/etl.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { asUser, createTestApp, internalOnly } from '../test-utils';
 
@@ -37,9 +38,8 @@ const DB_URL = (() => {
 const BASE_URL = DB_URL.split('?')[0];
 const REPLICAS = { fixture: `${SCHEMA}_fixture`, livescore: `${SCHEMA}_livescore`, statistics: `${SCHEMA}_statistics` };
 const ALL_SCHEMAS = [SCHEMA, ...Object.values(REPLICAS)];
-/** Conexión de solo lectura a una réplica (equivale al usuario analytics_ro). */
-const replicaUrl = (schema: string) =>
-  `${BASE_URL}?options=${encodeURIComponent(`-c search_path=${schema} -c default_transaction_read_only=on`)}`;
+/** Conexión a una réplica: solo el esquema; el modo de solo lectura lo agrega el servicio. */
+const replicaUrl = (schema: string) => `${BASE_URL}?options=${encodeURIComponent(`-c search_path=${schema}`)}`;
 
 const ORGANIZER_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
 const ADMIN = asUser({ id: '60000000-0000-4000-8000-000000000009', role: 'ADMIN' });
@@ -183,6 +183,15 @@ describe('Analytics Service · integración con PostgreSQL (ETL sobre réplicas 
     await expect(prisma.leagueKpi.findUnique({ where: { leagueId: LEAGUE_ID } })).resolves.toMatchObject({ totalMatches: 4, totalGoals: 4 });
     const runs = await http().get('/api/v1/analytics/etl/runs').set(ADMIN).expect(200);
     expect(runs.body.map((r: { status: string }) => r.status)).toEqual(['FAILED', 'SUCCESS', 'SUCCESS']);
+  });
+
+  it('las conexiones del ETL a las bases de los otros servicios son de solo lectura: una escritura falla', async () => {
+    type Replica = { query: (sql: string) => Promise<{ rows: Record<string, string>[] }> };
+    const fixture = (app.get(EtlService) as unknown as { replicas: Map<string, Replica> }).replicas.get('fixture');
+    if (!fixture) throw new Error('el ETL no abrió la conexión a la base de Fixture');
+    const { rows } = await fixture.query('SHOW default_transaction_read_only');
+    expect(rows[0].default_transaction_read_only).toBe('on');
+    await expect(fixture.query('CREATE TABLE intento_de_escritura (id int)')).rejects.toThrow(/read-only transaction/);
   });
 
   it('/metrics cuenta peticiones por ruta y código, y las corridas del ETL por resultado', async () => {
