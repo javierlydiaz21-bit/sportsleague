@@ -1,0 +1,50 @@
+erDiagram
+  match_results {
+    uuid match_id PK
+    uuid league_id
+    uuid season_id
+    uuid category_id
+    uuid owner_id
+    uuid home_team_id
+    uuid away_team_id
+    int home_score
+    int away_score
+    int version
+    timestamp completed_at
+    json events
+    timestamp updated_at
+  }
+  standings {
+    uuid id PK
+    uuid season_id
+    uuid category_id
+    uuid team_id
+    int position
+    int played
+    int wins
+    int draws
+    int losses
+    int goals_for
+    int goals_against
+    int goal_difference
+    int points
+    string_lista form
+    timestamp updated_at
+  }
+  top_scorers {
+    uuid id PK
+    uuid season_id
+    uuid category_id
+    uuid player_id
+    uuid team_id
+    int goals
+  }
+  disciplinary_records {
+    uuid id PK
+    uuid season_id
+    uuid category_id
+    uuid player_id
+    uuid team_id
+    int yellow_cards
+    int red_cards
+  }

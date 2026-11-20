@@ -1,0 +1,48 @@
+erDiagram
+  referees {
+    uuid id PK
+    uuid owner_id
+    uuid league_id
+    string name
+    string email
+    string phone
+    string zone
+    string_lista categories_certified
+    boolean active
+    timestamp created_at
+    timestamp updated_at
+  }
+  referee_availability {
+    uuid id PK
+    uuid referee_id FK
+    int day_of_week
+    string start_time
+    string end_time
+  }
+  scheduled_matches {
+    uuid match_id PK
+    uuid league_id
+    string league_name
+    uuid category_id
+    uuid owner_id
+    int round
+    string label
+    timestamp scheduled_at
+    string venue_name
+    string venue_zone
+    string status
+    timestamp updated_at
+  }
+  referee_assignments {
+    uuid id PK
+    uuid match_id
+    uuid referee_id FK
+    timestamp scheduled_at
+    boolean confirmed
+    AssignmentStatus status
+    boolean manual
+    timestamp created_at
+    timestamp updated_at
+  }
+  referees ||--o{ referee_availability : "referee"
+  referees ||--o{ referee_assignments : "referee"

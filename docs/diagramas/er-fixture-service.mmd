@@ -1,0 +1,32 @@
+erDiagram
+  fixtures {
+    uuid id PK
+    uuid season_id
+    uuid category_id
+    uuid league_id
+    uuid owner_id
+    FixtureStatus status
+    boolean double_round
+    int total_rounds
+    json config
+    timestamp created_at
+    timestamp published_at
+  }
+  matches {
+    uuid id PK
+    uuid fixture_id FK
+    uuid season_id
+    uuid category_id
+    uuid league_id
+    uuid owner_id
+    int round
+    uuid home_team_id
+    uuid away_team_id
+    uuid venue_id
+    timestamp scheduled_at
+    MatchStatus status
+    string suspension_reason
+    timestamp created_at
+    timestamp updated_at
+  }
+  fixtures ||--o{ matches : "fixture"

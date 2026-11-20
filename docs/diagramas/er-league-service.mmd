@@ -1,0 +1,57 @@
+erDiagram
+  leagues {
+    uuid id PK
+    string name
+    Sport sport
+    string description
+    string city
+    uuid owner_id
+    string owner_name
+    LeagueStatus status
+    string review_note
+    uuid reviewed_by
+    timestamp reviewed_at
+    timestamp created_at
+    timestamp updated_at
+  }
+  seasons {
+    uuid id PK
+    uuid league_id FK
+    string name
+    int year
+    timestamp start_date
+    timestamp end_date
+    timestamp created_at
+  }
+  categories {
+    uuid id PK
+    uuid league_id FK
+    string name
+    int min_age
+    int max_age
+    timestamp created_at
+  }
+  rules {
+    uuid id PK
+    uuid category_id FK, UK
+    int points_win
+    int points_draw
+    int points_loss
+    string_lista tiebreaker_criteria
+    timestamp updated_at
+  }
+  venues {
+    uuid id PK
+    uuid league_id FK
+    string name
+    string address
+    string zone
+    int_lista available_days
+    string open_time
+    string close_time
+    timestamp created_at
+  }
+  leagues ||--o{ seasons : "league"
+  leagues ||--o{ categories : "league"
+  categories ||--o| rules : "category"
+  leagues ||--o{ venues : "league"

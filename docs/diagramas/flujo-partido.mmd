@@ -1,0 +1,28 @@
+sequenceDiagram
+  participant O as Organizador
+  participant F as Fixture
+  participant R as Referee
+  participant N as Notification
+  participant A as Árbitro (app)
+  participant G as API Gateway
+  participant L as Live Score
+  participant B as Redis Pub/Sub
+  participant S as Statistics
+  participant E as Espectadores (WS)
+
+  O->>G: POST /fixtures/{id}/publish
+  G->>F: (JWT validado)
+  F-->>B: fixture.published (una vez por jornada)
+  B-->>R: asigna árbitro (disponibilidad, zona, categoría)
+  R-->>B: referee.assigned
+  B-->>N: avisa al árbitro, al organizador y a los seguidores
+  A->>G: POST /matches/{id}/events (gol)
+  G->>L: permisos: ¿árbitro asignado? (consulta a Referee)
+  L-->>B: match.event
+  B-->>L: todas las réplicas difunden por WebSocket
+  L-->>E: marcador actualizado al instante
+  A->>G: POST /matches/{id}/complete
+  L-->>B: match.completed (acta v1)
+  B-->>S: recalcula la tabla (idempotente)
+  B-->>F: estado FINISHED
+  B-->>N: resultado final a equipos y aficionados

@@ -1,0 +1,65 @@
+erDiagram
+  attendance_estimates {
+    uuid id PK
+    uuid match_id UK
+    uuid league_id
+    uuid season_id
+    uuid category_id
+    uuid owner_id
+    uuid home_team_id
+    uuid away_team_id
+    timestamp scheduled_at
+    int estimated_attendance
+    string source
+    timestamp computed_at
+  }
+  suspended_matches {
+    uuid id PK
+    uuid match_id UK
+    uuid league_id
+    uuid season_id
+    uuid category_id
+    uuid owner_id
+    uuid home_team_id
+    uuid away_team_id
+    string reason
+    timestamp scheduled_at
+    timestamp computed_at
+  }
+  team_performance_trend {
+    uuid id PK
+    uuid team_id
+    uuid season_id
+    uuid category_id
+    uuid league_id
+    int match_index
+    uuid match_id
+    string result
+    int points_cumulative
+    int goal_difference_cumulative
+    timestamp played_at
+  }
+  league_kpis {
+    uuid league_id PK
+    uuid owner_id
+    int total_matches
+    int scheduled
+    int live
+    int finished
+    int suspended
+    int total_goals
+    int total_cards
+    float avg_goals_per_match
+    float avg_attendance
+    timestamp computed_at
+  }
+  etl_runs {
+    uuid id PK
+    string trigger
+    string status
+    timestamp started_at
+    timestamp finished_at
+    int duration_ms
+    int rows_processed
+    string error
+  }
