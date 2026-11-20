@@ -1,0 +1,25 @@
+erDiagram
+  users {
+    uuid id PK
+    string email UK
+    string name
+    string password_hash
+    Role role
+    UserStatus status
+    timestamp last_login_at
+    timestamp created_at
+    timestamp updated_at
+  }
+  refresh_tokens {
+    uuid id PK
+    uuid user_id FK
+    string token_hash UK
+    string csrf_hash
+    timestamp expires_at
+    timestamp revoked_at
+    uuid replaced_by
+    string user_agent
+    string ip
+    timestamp created_at
+  }
+  users ||--o{ refresh_tokens : "user"

@@ -18,17 +18,19 @@ está hecha con Next.js y la app móvil con React Native (Expo).
 | Repositorio principal | https://github.com/javierlydiaz21-bit/sportsleague |
 | Enlaces y usuarios de prueba | [ENLACES_Y_USUARIOS.md](../ENLACES_Y_USUARIOS.md) |
 
-Las horas de las capturas son de Colombia (UTC−5). Las capturas no muestran la barra del navegador:
-debajo de cada una está la dirección exacta.
+**Versión desplegada.** Producción ejecuta la versión desplegada el 16/11/2026; team-service, la del
+18/11/2026, que desplegó su propio repositorio. Cinco cambios
+posteriores están en el código (rama `main` del repositorio principal), con sus pruebas, y funcionan en
+el entorno local, pero todavía no están en Render:
 
-> **Pendiente antes de entregar** (quitar este recuadro al terminar):
->
-> - Release de los 10 repositorios de servicio: lleva `/docs`, `/openapi.json` y la protección de
->   `/metrics` a producción, y el `deploy.yml` a los 9 repositorios que aún no lo tienen en `main`.
-> - Los 10 trabajos de recolección en Grafana Cloud y la ventana de recolección para la captura 22.
-> - Capturas pendientes: 4, 5, 6, 7, 9, 10, 14, 15, 17, 18, 19, 20, 21 y 22.
-> - Parte B, momento 1: el objetivo principal del sistema (los documentos de arquitectura no lo
->   formulan).
+- la documentación OpenAPI (`/docs` y `/openapi.json`);
+- `/metrics` protegido con `METRICS_TOKEN`;
+- la IP del cliente en el log de cada petición;
+- las conexiones de solo lectura de Analytics;
+- el `deploy.yml` en 9 de los 10 repositorios de servicio, que hoy solo está en `team-service`.
+
+Las capturas son del 18/11/2026 (la 6, del 20/11/2026), en hora de Colombia (UTC−5). No muestran la barra del navegador:
+debajo de cada una está la dirección exacta.
 
 ---
 
@@ -61,9 +63,11 @@ existe, la prueba automatizada que lo verifica.
 
 **Desviación justificada (ANA-01).** El documento pide que el ETL de Analytics lea réplicas de solo
 lectura. Render Free no tiene réplicas y permite una sola PostgreSQL, así que en producción Analytics
-lee las bases de Fixture, Live Score y Statistics de esa misma instancia. Abre cada conexión en modo de
-solo lectura (`default_transaction_read_only=on`): cualquier escritura falla. No es un usuario con
-permisos restringidos. En local sí lee con el usuario `analytics_ro`, que solo tiene permiso `SELECT`.
+lee las bases de Fixture, Live Score y Statistics de esa misma instancia. El código abre cada conexión
+en modo de solo lectura (`default_transaction_read_only=on`), así que cualquier escritura falla; no es
+un usuario con permisos restringidos. En local lee además con el usuario `analytics_ro`, que solo tiene
+permiso `SELECT`. Como se indica arriba, el modo de solo lectura y la IP en los logs (GW-04) están en el
+código y en local, pero aún no en la versión desplegada.
 
 **Elementos técnicos externos:** correo real con Gmail a través de Google Apps Script, notificaciones
 push del navegador con Web Push (VAPID) y marcador en vivo por WebSocket (ver A.3).
@@ -96,8 +100,8 @@ servicio se publica con su historial (`git subtree split`) en su propio reposito
 | Elemento | Dónde |
 |---|---|
 | README | Secciones *Responsabilidad*, *Tecnologías*, *Estructura del proyecto*, *Instalación y ejecución*, *Pruebas y calidad*, *Endpoints principales*, *Eventos*, *Comunicación con otros servicios*, *Base de datos*, *Variables de entorno*, *Despliegue* y *Autores* |
-| Base de datos | Esquema de Prisma y migraciones en `prisma/`, que se aplican al arrancar (`npx prisma migrate deploy`). En `database/`: `esquema.sql`, `datos-ejemplo.sql` y `respaldo.sql`, generados con `pg_dump` desde una demostración limpia. El API Gateway no tiene base de datos: solo usa Redis |
-| Documentación de la API | `GET /docs` (Swagger UI) y `GET /openapi.json` (OpenAPI 3), generados con `@nestjs/swagger` a partir de los controladores y los DTO; en el gateway, con el esquema Bearer (JWT) |
+| Base de datos | Esquema de Prisma y migraciones en `prisma/`, que se aplican al arrancar (`npx prisma migrate deploy`). En `database/`: `esquema.sql`, `datos-ejemplo.sql` y `respaldo.sql`, generados con `pg_dump` desde una demostración limpia. El API Gateway no tiene base de datos: solo usa Redis. Los diagramas entidad-relación están en la Parte B, momento 2 |
+| Documentación de la API | La sección *Endpoints principales* del README de cada servicio (método, ruta, quién puede usarla y qué hace). Además, el código genera `GET /docs` (Swagger UI) y `GET /openapi.json` (OpenAPI 3) con `@nestjs/swagger`, con los campos de los DTO y, en el gateway, el esquema Bearer (JWT). Esta documentación OpenAPI funciona en el entorno local (por ejemplo, http://localhost:4002/docs para League) y llega a producción con el siguiente despliegue |
 | `.env.example` y `.gitignore` | Variables con valores de ejemplo; el `.env` real queda fuera del repositorio. En cada ejecución del CI, gitleaks revisa todo el historial en busca de secretos |
 | CI/CD | `.github/workflows/ci.yml` y `.github/workflows/deploy.yml` (ver A.5) |
 
@@ -123,8 +127,6 @@ Tomada el 18/11/2026 a las 17:01.
 Dirección: https://github.com/javierlydiaz21-bit/sportsleague/commits/main · Tomada el 18/11/2026 a
 las 17:02.
 
-[CAPTURA 4: /docs de un servicio en producción (Swagger UI) con un endpoint abierto y los campos de su DTO]
-
 ### A.3 Enlaces de despliegue
 
 **Qué pide la guía:** un enlace activo por microservicio, conectado a su base de datos, con las
@@ -135,27 +137,26 @@ enlace a la documentación de la API, al frontend y al gateway, con usuarios y d
 
 - **Render Free:** los 10 microservicios como servicios web, una PostgreSQL con una base por servicio
   (`DATABASE_NAME` elige la base de la misma instancia) y Redis. Cada servicio ejecuta la imagen
-  `ghcr.io/javierlydiaz21-bit/sportsleague-app-<servicio>` que publica su repositorio.
+  `ghcr.io/javierlydiaz21-bit/sportsleague-app-<servicio>`.
 - **Vercel Hobby:** la web.
 
 | Servicio | Enlace | Estado | Documentación de la API |
 |---|---|---|---|
-| API Gateway | https://sportsleague-jd-gateway.onrender.com | [/health](https://sportsleague-jd-gateway.onrender.com/health) | [/docs](https://sportsleague-jd-gateway.onrender.com/docs) |
-| Auth | https://sportsleague-jd-auth.onrender.com | [/health](https://sportsleague-jd-auth.onrender.com/health) | [/docs](https://sportsleague-jd-auth.onrender.com/docs) |
-| League | https://sportsleague-jd-league.onrender.com | [/health](https://sportsleague-jd-league.onrender.com/health) | [/docs](https://sportsleague-jd-league.onrender.com/docs) |
-| Team | https://sportsleague-jd-team.onrender.com | [/health](https://sportsleague-jd-team.onrender.com/health) | [/docs](https://sportsleague-jd-team.onrender.com/docs) |
-| Fixture | https://sportsleague-jd-fixture.onrender.com | [/health](https://sportsleague-jd-fixture.onrender.com/health) | [/docs](https://sportsleague-jd-fixture.onrender.com/docs) |
-| Referee | https://sportsleague-jd-referee.onrender.com | [/health](https://sportsleague-jd-referee.onrender.com/health) | [/docs](https://sportsleague-jd-referee.onrender.com/docs) |
-| Live Score | https://sportsleague-jd-live.onrender.com | [/health](https://sportsleague-jd-live.onrender.com/health) | [/docs](https://sportsleague-jd-live.onrender.com/docs) |
-| Statistics | https://sportsleague-jd-statistics.onrender.com | [/health](https://sportsleague-jd-statistics.onrender.com/health) | [/docs](https://sportsleague-jd-statistics.onrender.com/docs) |
-| Notification | https://sportsleague-jd-notification.onrender.com | [/health](https://sportsleague-jd-notification.onrender.com/health) | [/docs](https://sportsleague-jd-notification.onrender.com/docs) |
-| Analytics | https://sportsleague-jd-analytics.onrender.com | [/health](https://sportsleague-jd-analytics.onrender.com/health) | [/docs](https://sportsleague-jd-analytics.onrender.com/docs) |
+| API Gateway | https://sportsleague-jd-gateway.onrender.com | [/health](https://sportsleague-jd-gateway.onrender.com/health) | [Endpoints principales](https://github.com/javierlydiaz21-bit/sportsleague-api-gateway#endpoints-principales) |
+| Auth | https://sportsleague-jd-auth.onrender.com | [/health](https://sportsleague-jd-auth.onrender.com/health) | [Endpoints principales](https://github.com/javierlydiaz21-bit/sportsleague-auth-service#endpoints-principales) |
+| League | https://sportsleague-jd-league.onrender.com | [/health](https://sportsleague-jd-league.onrender.com/health) | [Endpoints principales](https://github.com/javierlydiaz21-bit/sportsleague-league-service#endpoints-principales) |
+| Team | https://sportsleague-jd-team.onrender.com | [/health](https://sportsleague-jd-team.onrender.com/health) | [Endpoints principales](https://github.com/javierlydiaz21-bit/sportsleague-team-service#endpoints-principales) |
+| Fixture | https://sportsleague-jd-fixture.onrender.com | [/health](https://sportsleague-jd-fixture.onrender.com/health) | [Endpoints principales](https://github.com/javierlydiaz21-bit/sportsleague-fixture-service#endpoints-principales) |
+| Referee | https://sportsleague-jd-referee.onrender.com | [/health](https://sportsleague-jd-referee.onrender.com/health) | [Endpoints principales](https://github.com/javierlydiaz21-bit/sportsleague-referee-service#endpoints-principales) |
+| Live Score | https://sportsleague-jd-live.onrender.com | [/health](https://sportsleague-jd-live.onrender.com/health) | [Endpoints principales](https://github.com/javierlydiaz21-bit/sportsleague-live-score-service#endpoints-principales) |
+| Statistics | https://sportsleague-jd-statistics.onrender.com | [/health](https://sportsleague-jd-statistics.onrender.com/health) | [Endpoints principales](https://github.com/javierlydiaz21-bit/sportsleague-statistics-service#endpoints-principales) |
+| Notification | https://sportsleague-jd-notification.onrender.com | [/health](https://sportsleague-jd-notification.onrender.com/health) | [Endpoints principales](https://github.com/javierlydiaz21-bit/sportsleague-notification-service#endpoints-principales) |
+| Analytics | https://sportsleague-jd-analytics.onrender.com | [/health](https://sportsleague-jd-analytics.onrender.com/health) | [Endpoints principales](https://github.com/javierlydiaz21-bit/sportsleague-analytics-service#endpoints-principales) |
 
 **Conexión con la base de datos.** `GET /health` responde `200` solo si el servicio llega a su base y
 a Redis, y `503` si no. Las credenciales no están en el código: `DATABASE_URL` y `REDIS_URL` están en
-las variables de cada servicio en Render, y `JWT_SECRET`, `INTERNAL_API_TOKEN` y `METRICS_TOKEN`, en el
-grupo de variables compartido `sportsleague-free-shared`. La base gratuita de Render vence el
-16/12/2026.
+las variables de cada servicio en Render, y `JWT_SECRET` e `INTERNAL_API_TOKEN`, en el grupo de
+variables compartido `sportsleague-free-shared`. La base gratuita de Render vence el 16/12/2026.
 
 **Integraciones externas en producción** (variables en Render → `sportsleague-jd-notification`):
 
@@ -179,21 +180,21 @@ Los servicios gratuitos se duermen tras 15 minutos sin tráfico. Antes de una re
 `scripts/despertar.ps1` los despierta y espera a que los 10 y la web respondan `200` (README, sección
 «Antes de una demostración»).
 
-[CAPTURA 5: salida de scripts/despertar.ps1 con los 10 servicios y la web en 200]
+**Captura 4.** Variables de entorno de `sportsleague-jd-team` en Render: las credenciales están en la
+plataforma y sus valores se ven ocultos.
 
-[CAPTURA 6: panel de Render con los 10 servicios desplegados]
+![Captura 4: variables de entorno en Render](capturas/04-variables-render.png)
 
-[CAPTURA 7: variables de entorno de un servicio en Render, con los valores ocultos]
+Dirección: https://dashboard.render.com/web/srv-db7erhlg1s2s73a93r9g/env · Tomada el 18/11/2026 a las
+17:19.
 
-**Captura 8.** Web en producción: «Liga Amateur de Montería», pestaña *Posiciones*, con la sesión del
+**Captura 5.** Web en producción: «Liga Amateur de Montería», pestaña *Posiciones*, con la sesión del
 aficionado de prueba.
 
-![Captura 8: web en producción con la tabla de posiciones](capturas/08-liga-posiciones.png)
+![Captura 5: web en producción con la tabla de posiciones](capturas/05-liga-posiciones.png)
 
 Dirección: https://sportsleague-cyan.vercel.app/ligas/0168ab73-ff3f-4a6d-8448-00402efffc3c?tab=posiciones ·
 Tomada el 18/11/2026 a las 17:04.
-
-[CAPTURA 9: correo real o notificación push recibidos desde producción]
 
 ### A.4 Pruebas automatizadas
 
@@ -236,20 +237,26 @@ npm run test:integration   # integración (PostgreSQL de Docker Compose: docker 
 npm run test:cov           # todas, con el informe de cobertura y el umbral del 50 %
 ```
 
-[CAPTURA 10: pruebas de un servicio en local (npm run test:cov) con el resumen de Jest y la tabla de cobertura]
+**Captura 6.** Pruebas de team-service en local (`npm run test:cov`) contra la PostgreSQL de Docker
+Compose: resumen de Jest y tabla de cobertura.
 
-**Captura 11.** Ejecución del CI de team-service en GitHub Actions, en verde, con el artefacto
+![Captura 6: pruebas en local](capturas/06-pruebas-local.png)
+
+Dirección: terminal de PowerShell en el equipo de desarrollo, con una copia de `services/team-service`
+· Tomada el 20/11/2026 a las 17:41.
+
+**Captura 7.** Ejecución del CI de team-service en GitHub Actions, en verde, con el artefacto
 `coverage-team-service`.
 
-![Captura 11: CI en verde con el artefacto de cobertura](capturas/11-ci-artefacto.png)
+![Captura 7: CI en verde con el artefacto de cobertura](capturas/07-ci-artefacto.png)
 
 Dirección: https://github.com/javierlydiaz21-bit/sportsleague/actions/runs/44358095467 · Tomada el
 18/11/2026 a las 17:02.
 
-**Captura 12.** Informe de cobertura (Istanbul) del artefacto `coverage-team-service`: 68,14 % de
+**Captura 8.** Informe de cobertura (Istanbul) del artefacto `coverage-team-service`: 68,14 % de
 líneas.
 
-![Captura 12: informe de cobertura](capturas/12-informe-cobertura.png)
+![Captura 8: informe de cobertura](capturas/08-informe-cobertura.png)
 
 Dirección: archivo `lcov-report/index.html` del artefacto `coverage-team-service` de la ejecución
 https://github.com/javierlydiaz21-bit/sportsleague/actions/runs/44358095467, abierto en el navegador
@@ -270,6 +277,11 @@ despliegue automático, la reacción ante una prueba fallida y la estrategia de 
 | `.github/workflows/ci.yml` | Pull requests hacia `main` o `develop`, push a `develop` y ejecución manual | Llama al CI compartido `ci-servicio.yml@v1`: *Lint, pruebas y build* (npm ci → Prisma → ESLint → Jest con PostgreSQL 16 y cobertura → informe como artefacto → build), *Escaneo de secretos* (gitleaks) e *Imagen Docker* (construye sin publicar) |
 | `.github/workflows/deploy.yml` («Despliegue continuo») | Push a `main`, es decir, al fusionar un pull request, y ejecución manual | 1) Corre el mismo CI. 2) Solo si pasa, publica la imagen `:<sha>` y `:latest` en GitHub Container Registry. 3) Llama al *deploy hook* de Render con la imagen de ese commit. Si falta el secreto del hook, el despliegue falla |
 
+**Estado:** `ci.yml` está en los 10 repositorios de servicio. `deploy.yml` está en `main` de
+`sportsleague-team-service`, donde ya desplegó automáticamente (evidencia abajo). Para los otros 9 está
+listo en el repositorio principal (`services/<servicio>/.github/workflows/deploy.yml`), con su secreto
+`RENDER_DEPLOY_HOOK` ya configurado en cada repositorio; llega a su `main` con el siguiente release.
+
 En el repositorio principal, cada servicio tiene además su workflow (`<servicio>.yml`, que llama a
 `service-pipeline.yml`). Se activa con push a `main` o `develop` y con pull requests cuando cambia ese
 servicio. Corre el mismo CI y, en Live Score, pruebas de carga con k6, pero no publica imágenes ni
@@ -277,18 +289,16 @@ despliega, para que nada se despliegue dos veces. Los workflows usan Node.js 22 
 su SHA con la versión en un comentario. Los pasos propios del CI tienen nombres descriptivos en español,
 por ejemplo «Instalar dependencias (npm ci)» y «Pruebas unitarias e integración (Jest)».
 
-**Ejecuciones exitosas y despliegue automático.** Prueba piloto en `sportsleague-team-service`: el push
-a `main` del commit `f3d9b76` disparó «Despliegue continuo», que pasó el CI, publicó la imagen y desplegó
+**Un cambio que termina en un despliegue automático.** En `sportsleague-team-service`, el push a `main`
+del commit `f3d9b76` disparó «Despliegue continuo», que pasó el CI, publicó la imagen y desplegó
 `sportsleague-app-team-service:f3d9b764d7c89012205a332e196ce06c85cdb8cb` en Render.
 
-**Captura 13.** «Despliegue continuo» en verde: los jobs del CI y, después, *Despliegue en Render*.
+**Captura 9.** «Despliegue continuo» en verde: los jobs del CI y, después, *Despliegue en Render*.
 
-![Captura 13: run de Despliegue continuo en verde](capturas/13-despliegue-continuo.png)
+![Captura 9: run de Despliegue continuo en verde](capturas/09-despliegue-continuo.png)
 
 Dirección: https://github.com/javierlydiaz21-bit/sportsleague-team-service/actions/runs/44313143371 ·
 Tomada el 18/11/2026 a las 17:02.
-
-[CAPTURA 14: Render → sportsleague-jd-team → Events, con el despliegue de la imagen del commit en estado live]
 
 **Reacción ante una prueba fallida.** En `main` de cada repositorio de servicio, GitHub exige pull
 request y los checks *ci / Lint, pruebas y build*, *ci / Escaneo de secretos* y *ci / Imagen Docker* en
@@ -301,12 +311,18 @@ verde, también para los administradores, y no permite *force push*. Evidencia: 
 - GitHub bloquea el merge. Sin merge a `main`, `deploy.yml` no corre: no se publica imagen ni se
   despliega.
 
-[CAPTURA 15: pull request #5 de sportsleague-team-service bloqueado, con «ci / Lint, pruebas y build» en rojo]
+**Captura 10.** Pull request #5 bloqueado: el check requerido *Lint, pruebas y build* falla, *Imagen
+Docker* se omite y el botón de merge queda deshabilitado.
 
-**Captura 16.** El job del pull request #5: falla el paso de Jest y no corren *Compilar* ni *Imagen
+![Captura 10: pull request bloqueado por la prueba fallida](capturas/10-pr-bloqueada.png)
+
+Dirección: https://github.com/javierlydiaz21-bit/sportsleague-team-service/pull/5 · Tomada el
+18/11/2026 a las 17:19.
+
+**Captura 11.** El job del pull request #5: falla el paso de Jest y no corren *Compilar* ni *Imagen
 Docker*.
 
-![Captura 16: job con la prueba fallida](capturas/16-prueba-fallida.png)
+![Captura 11: job con la prueba fallida](capturas/11-prueba-fallida.png)
 
 Dirección: https://github.com/javierlydiaz21-bit/sportsleague-team-service/actions/runs/44354414262/job/134978507531 ·
 Tomada el 18/11/2026 a las 17:02.
@@ -315,11 +331,23 @@ Tomada el 18/11/2026 a las 17:02.
 `RENDER_DEPLOY_HOOK`, que solo lee el job de despliegue; el YAML lo referencia como
 `${{ secrets.RENDER_DEPLOY_HOOK }}`. El `GITHUB_TOKEN` solo tiene permiso para publicar paquetes en ese
 job. Las credenciales de la base de datos y los demás secretos de ejecución están en las variables de
-Render, no en GitHub ni en el código.
+Render (captura 4), no en GitHub ni en el código.
 
-[CAPTURA 17: Settings → Secrets and variables → Actions de sportsleague-team-service, con RENDER_DEPLOY_HOOK]
+**Captura 12.** Secretos de Actions de `sportsleague-team-service`: solo `RENDER_DEPLOY_HOOK`, sin su
+valor.
 
-[CAPTURA 18: regla de protección de main en sportsleague-team-service, con los tres checks obligatorios]
+![Captura 12: secretos de GitHub Actions](capturas/12-secretos-github.png)
+
+Dirección: https://github.com/javierlydiaz21-bit/sportsleague-team-service/settings/secrets/actions ·
+Tomada el 18/11/2026 a las 17:20.
+
+**Captura 13.** Regla de protección de `main`: los tres checks del CI son obligatorios y no se puede
+saltar la regla.
+
+![Captura 13: protección de la rama main](capturas/13-proteccion-main.png)
+
+Dirección: https://github.com/javierlydiaz21-bit/sportsleague-team-service/settings/branch_protection_rules/84983266 ·
+Tomada el 18/11/2026 a las 17:20.
 
 **Estrategia de ramas y control de versiones** (README, «Estrategia de ramas y control de versiones»):
 
@@ -347,8 +375,7 @@ con datos reales y de los targets en UP, con los archivos de configuración en e
 - **`/metrics`:** los 10 servicios exponen métricas HTTP con `prom-client` y métricas del negocio, por
   ejemplo `match_events_registered_total`, `live_score_update_latency_seconds`, `live_viewers_total`,
   `standings_recalculations_total`, `referee_assignments_total`, `circuit_breaker_state` y
-  `gateway_rate_limit_rejections_total`. En producción `/metrics` exige
-  `Authorization: Bearer <METRICS_TOKEN>` y responde `401` sin él.
+  `gateway_rate_limit_rejections_total`.
 - **Prometheus:** [`infra/prometheus/prometheus.yml`](../infra/prometheus/prometheus.yml) recoge los 10
   servicios cada 15 s. Las alertas están en [`infra/prometheus/alerts.yml`](../infra/prometheus/alerts.yml).
 - **Grafana:** dashboard «SportsLeague — Jornada en vivo»
@@ -356,26 +383,35 @@ con datos reales y de los targets en UP, con los archivos de configuración en e
   conectado a Prometheus por el datasource de `infra/grafana/provisioning/`. Por microservicio muestra
   disponibilidad (ARRIBA/CAÍDO), peticiones por segundo, tiempo de respuesta p95 y tasa de errores 5xx,
   más métricas del negocio, con filtros por liga, temporada y categoría.
-- **En local:** Prometheus en http://localhost:9090 y Grafana en http://localhost:3100, con Docker Compose.
-- **En producción:** Grafana Cloud lee el `/metrics` de cada servicio de Render con un trabajo de
-  recolección por servicio (`sportsleague-<servicio>`), autenticado con `METRICS_TOKEN`. El mismo
-  dashboard está en Grafana Cloud ([`infra/grafana-cloud/`](../infra/grafana-cloud/)) con un
-  [enlace público](https://jademantel3442.grafana.net/public-dashboards/104a3d4644dd4bfaac49d671212d5e66).
-  Cada lectura despierta al servicio y Render Free da 750 horas al mes para todo el espacio de trabajo,
-  así que la recolección se enciende solo para las capturas y la sustentación.
+- **Ejecución:** Prometheus (http://localhost:9090) y Grafana (http://localhost:3100) corren con Docker
+  Compose. Las capturas 14 y 15 son de ese entorno, después de unos minutos de uso real de la web local:
+  inicios de sesión, consulta de ligas, un aficionado siguiendo un partido y un gol registrado desde
+  *Control en vivo*.
+- **Producción:** el dashboard está importado en Grafana Cloud ([`infra/grafana-cloud/`](../infra/grafana-cloud/))
+  y publicado con un
+  [enlace público](https://jademantel3442.grafana.net/public-dashboards/104a3d4644dd4bfaac49d671212d5e66),
+  pero todavía no muestra datos: la recolección desde Render no está activa. Leer `/metrics` despierta a
+  cada servicio, y Render Free da 750 horas al mes para todo el espacio de trabajo.
 
-[CAPTURA 19: Prometheus local → Status → Targets, con los 10 servicios en UP]
+**Captura 14.** Prometheus: `sportsleague (10/10 up)`, los 10 microservicios en estado UP.
 
-[CAPTURA 20: Grafana local, dashboard «SportsLeague — Jornada en vivo» con datos en todos los paneles]
+![Captura 14: targets de Prometheus](capturas/14-prometheus-targets.png)
 
-[CAPTURA 21: /metrics de un servicio en producción sin token, respondiendo 401]
+Dirección: http://localhost:9090/targets · Tomada el 18/11/2026 a las 17:27.
 
-[CAPTURA 22: dashboard público de Grafana Cloud con los 10 servicios ARRIBA y datos de producción]
+**Captura 15.** Grafana, dashboard «SportsLeague — Jornada en vivo» con datos reales de los últimos 15
+minutos: 10 microservicios ARRIBA, peticiones por segundo, tiempo de respuesta p95, errores 5xx, el gol
+registrado y la latencia del marcador en vivo.
 
-**Captura 23.** *Administración → Sistema* en producción: los 10 servicios activos, con su base y
+![Captura 15: dashboard de Grafana con datos](capturas/15-grafana-local.png)
+
+Dirección: http://localhost:3100/d/sportsleague/sportsleague-e28094-jornada-en-vivo?orgId=1&from=now-15m&to=now ·
+Tomada el 18/11/2026 a las 17:31.
+
+**Captura 16.** *Administración → Sistema* en producción: los 10 servicios activos, con su base y
 Redis, y el enlace al dashboard de Grafana Cloud (arriba a la derecha).
 
-![Captura 23: Administración, Sistema](capturas/23-sistema-grafana.png)
+![Captura 16: Administración, Sistema](capturas/16-sistema-grafana.png)
 
 Dirección: https://sportsleague-cyan.vercel.app/admin?tab=sistema · Tomada el 18/11/2026 a las 17:05.
 
@@ -389,11 +425,9 @@ Los cinco momentos de la guía. Las citas son de los documentos de arquitectura 
 
 ### 1. Contexto del problema y necesidades de solución
 
-- **Contexto general (M1, p. 5):** «SportsLeague es una plataforma para federaciones y organizadores
-  de ligas amateur (fútbol, básquet, vóley) que manejan varias categorías, equipos y sedes al mismo
-  tiempo. Reemplaza las hojas de cálculo y los grupos de WhatsApp por un sistema centralizado que
-  programa partidos, registra resultados en vivo y mantiene informados a equipos, jugadores y
-  árbitros.»
+- **Contexto general (M1, «Visión General del Proyecto», p. 5):** «SportsLeague es una plataforma para
+  federaciones y organizadores de ligas amateur (fútbol, básquet, vóley) que manejan varias categorías,
+  equipos y sedes al mismo tiempo.»
 - **Usuarios:**
   - *Organizadores:* crean su liga, temporadas, categorías y reglamento, canchas, equipos y jugadores, y
     árbitros; generan el calendario y controlan los partidos en vivo.
@@ -401,13 +435,14 @@ Los cinco momentos de la guía. Las citas son de los documentos de arquitectura 
     funcione.
   - *Árbitros:* ven y confirman sus partidos asignados y registran goles, tarjetas y cambios.
   - *Aficionados:* siguen ligas, ven el marcador en tiempo real y reciben avisos.
-- **Necesidades detectadas:** según M1 (p. 5), reemplazar las hojas de cálculo y los grupos de WhatsApp
-  por un sistema que programe partidos, registre resultados en vivo y mantenga informados a equipos,
-  jugadores y árbitros. M1 señala dos componentes críticos: el calendario, que debe respetar la
-  disponibilidad de canchas y árbitros y el descanso mínimo entre partidos, y el marcador en vivo «para
-  miles de espectadores conectados a la vez».
-- **Objetivo principal del sistema:** [PENDIENTE: los documentos de arquitectura no lo formulan; lo
-  redacta el equipo].
+- **Necesidades detectadas:** dejar las hojas de cálculo y los grupos de WhatsApp; programar los
+  partidos de varias categorías y sedes; registrar los resultados en vivo; y mantener informados a
+  equipos, jugadores y árbitros. M1 señala dos componentes críticos: el calendario, que debe respetar
+  la disponibilidad de canchas y árbitros y el descanso mínimo entre partidos, y el marcador en vivo
+  «para miles de espectadores conectados a la vez».
+- **Objetivo principal del sistema (M1, «Visión General del Proyecto», p. 5):** reemplazar «las hojas
+  de cálculo y los grupos de WhatsApp por un sistema centralizado que programa partidos, registra
+  resultados en vivo y mantiene informados a equipos, jugadores y árbitros».
 - **Justificación de la solución (M1, 1.1, p. 5):** «se eligió una arquitectura de microservicios en
   lugar de un monolito porque el sistema agrupa dominios de negocio muy distintos entre sí (…) cada uno
   con patrones de carga, criticidad y ritmo de cambio diferentes. (…) Mantener estos dominios en
@@ -417,7 +452,8 @@ Los cinco momentos de la guía. Las citas son de los documentos de arquitectura 
   - *Restricciones del proyecto (M1, p. 5):* «microservicios, base de datos relacional independiente
     por servicio, CI/CD con GitHub Actions, despliegue sin AWS/Azure/GCP, y Docker obligatorio».
   - *Lo que se construyó:* 10 microservicios (los 8 del documento más Auth y el API Gateway), la web,
-    la app móvil para árbitros y espectadores, el despliegue en Render y Vercel y el monitoreo.
+    la app móvil para árbitros y espectadores, el despliegue en Render y Vercel, las pruebas, el CI/CD y
+    el monitoreo.
 
 ### 2. Aspectos técnicos de la arquitectura
 
@@ -450,30 +486,76 @@ entra por el API Gateway; el marcador en vivo llega por WebSocket desde Live Sco
 - **Eventos asíncronos** en Redis Pub/Sub para el flujo del partido, con consumidores idempotentes.
 - **WebSocket** (Socket.IO) para difundir el marcador a los espectadores.
 
-**Uso de APIs.** API REST versionada bajo `/api/v1`, documentada con OpenAPI en `/docs` y
-`/openapi.json` de cada servicio, y validada con `class-validator` en los DTO. Integraciones externas:
-Google Apps Script (correo) y Web Push.
+**Uso de APIs.** API REST versionada bajo `/api/v1`, documentada en el README de cada servicio y con
+OpenAPI (`/docs` y `/openapi.json`) en el código, y validada con `class-validator` en los DTO.
+Integraciones externas: Google Apps Script (correo) y Web Push.
 
-**Patrón SAGA: no está implementado.** El documento de arquitectura lo descartó (M1, 4.3, p. 22): «El
-patrón Saga no resulta crítico para este dominio de negocio (…). En SportsLeague no existe una
-transacción de negocio que requiera revertirse en cadena: si el recálculo de estadísticas falla tras un
-match.completed, basta con reintentar el procesamiento del evento de forma idempotente. Por ello se
-prioriza la consistencia eventual…». El código sigue esa decisión: no hay orquestador de saga ni
-transacciones de compensación. En su lugar:
+**Patrón SAGA: no está implementado.** Fue una decisión de diseño. M1 (4.3, p. 22): «El patrón Saga
+no resulta crítico para este dominio de negocio, a diferencia de un sistema de comercio electrónico
+donde una orden dispara una cadena estricta de pasos compensables (pago, inventario, envío). En
+SportsLeague no existe una transacción de negocio que requiera revertirse en cadena: si el recálculo de
+estadísticas falla tras un match.completed, basta con reintentar el procesamiento del evento de forma
+idempotente. Por ello se prioriza la consistencia eventual entre los resultados registrados y las
+estadísticas calculadas, apoyada en un mecanismo de recálculo idempotente…».
 
-- consumidores idempotentes: asignaciones únicas por partido, notificaciones con clave de duplicado y
-  actas con versión;
-- Statistics recalcula desde las actas completas y ofrece *Recalcular*, que vuelve a leer las actas de
-  Live Score si se perdió algún `match.completed`;
-- las correcciones del acta tras el cierre republican `match.completed` con una versión nueva.
+El código sigue esa decisión: no hay orquestador de saga ni transacciones de compensación. En su lugar,
+consistencia eventual con estos mecanismos, cada uno con su prueba:
+
+| Mecanismo | Dónde se demuestra (prueba) |
+|---|---|
+| Statistics procesa cada acta una sola vez aunque el evento llegue repetido | `statistics-service/src/statistics/statistics.service.spec.ts`: «procesar el mismo evento dos veces no duplica efectos (idempotencia)». Integración: «un acta repetida no duplica efectos, la corrección se aplica y una versión vieja se ignora» |
+| Si se perdió un `match.completed`, *Recalcular* recupera el acta de Live Score (conciliación) | `statistics-service/test/integration/statistics.integration.spec.ts`: «el organizador recalcula con conciliación y recupera del Live Score Service el acta que se había perdido» |
+| Las correcciones del acta tras el cierre se republican con una versión nueva | `live-score-service/src/live/live.service.spec.ts`: «una corrección posterior al cierre republica el acta con una nueva versión» |
+| Referee no asigna dos veces el mismo partido | `referee-service/src/assignments/referees.service.spec.ts`: «no asigna dos veces el mismo partido si el evento se repite (idempotencia)» |
+| Notification no duplica avisos ni correos | `notification-service/src/notifications/notifications.service.spec.ts`: «no duplica notificaciones si el mismo evento llega dos veces». Integración: «si el mismo mensaje se entrega dos veces no se duplican avisos ni correos (idempotencia)» |
+| Fixture actualiza el estado del partido sin retroceder | `fixture-service/src/fixtures/fixtures.service.spec.ts`: «actualiza el estado del partido de forma idempotente al recibir match.completed» |
 
 **Manejo de bases de datos.** Una base PostgreSQL por servicio (`auth_db`, `league_db`, `team_db`,
 `fixture_db`, `referee_db`, `livescore_db`, `statistics_db`, `notification_db`, `analytics_db`), con su
 esquema y migraciones de Prisma. Ningún servicio consulta la base de otro: los datos de otro dominio se
-piden por REST o llegan por eventos. En local cada base tiene su propio usuario de PostgreSQL. En Render
-Free todas las bases están en una sola instancia, con el mismo usuario. Analytics lee las bases de
-Fixture, Live Score y Statistics con conexiones de solo lectura. Redis se usa como bus de eventos, caché
-y contador del rate limiting.
+piden por REST o llegan por eventos, y los identificadores de otros servicios (por ejemplo,
+`category_id` en Team) se guardan sin clave foránea entre bases. En local cada base tiene su propio
+usuario de PostgreSQL. En Render Free todas las bases están en una sola instancia, con el mismo usuario.
+Redis se usa como bus de eventos, caché y contador del rate limiting.
+
+Diagramas entidad-relación de cada base, generados desde su `prisma/schema.prisma` (las fuentes Mermaid
+están en `docs/diagramas/er-*.mmd`):
+
+**Auth (`auth_db`)**
+
+![Diagrama entidad-relación de Auth](diagramas/er-auth-service.png)
+
+**League (`league_db`)**
+
+![Diagrama entidad-relación de League](diagramas/er-league-service.png)
+
+**Team (`team_db`)**
+
+![Diagrama entidad-relación de Team](diagramas/er-team-service.png)
+
+**Fixture (`fixture_db`)**
+
+![Diagrama entidad-relación de Fixture](diagramas/er-fixture-service.png)
+
+**Referee (`referee_db`)**
+
+![Diagrama entidad-relación de Referee](diagramas/er-referee-service.png)
+
+**Live Score (`livescore_db`)**
+
+![Diagrama entidad-relación de Live Score](diagramas/er-live-score-service.png)
+
+**Statistics (`statistics_db`)**
+
+![Diagrama entidad-relación de Statistics](diagramas/er-statistics-service.png)
+
+**Notification (`notification_db`)**
+
+![Diagrama entidad-relación de Notification](diagramas/er-notification-service.png)
+
+**Analytics (`analytics_db`)**
+
+![Diagrama entidad-relación de Analytics](diagramas/er-analytics-service.png)
 
 **Orquestación o coordinación de servicios.** No hay un orquestador central: el flujo del partido se
 coordina por eventos. M1 (4.2, p. 22) dice: «El flujo operativo central del sistema (…) se coordina en
@@ -488,7 +570,7 @@ producción.
 - bloquea las cuentas suspendidas, las rutas internas y las de administración a quien no es `ADMIN`;
 - aplica rate limiting en Redis por niveles (inicio de sesión, escritura y lectura) y CORS solo para la
   web;
-- registra cada petición con la IP del cliente y agrega la salud de los servicios;
+- registra cada petición y agrega la salud de los servicios;
 - en Render Free despierta a los servicios dormidos.
 
 **Autenticación y autorización:**
@@ -502,75 +584,13 @@ producción.
 
 **Diagramas de arquitectura.**
 
-Arquitectura implementada (README):
+Arquitectura implementada (README, fuente en `docs/diagramas/arquitectura.mmd`):
 
-```mermaid
-flowchart LR
-  subgraph Clientes
-    WEB["Web Next.js<br/>(organizadores, árbitros,<br/>aficionados, admin)"]
-    APP["App React Native (Expo)<br/>(árbitros y espectadores)"]
-  end
-  WEB -- HTTP --> GW["API Gateway<br/>JWT · rate limiting · CORS · logs"]
-  APP -- HTTP --> GW
-  WEB -. WebSocket .-> LIVE
-  APP -. WebSocket .-> LIVE
+![Arquitectura implementada](diagramas/arquitectura.png)
 
-  GW --> AUTH[Auth]
-  GW --> LEAGUE[League]
-  GW --> TEAM[Team]
-  GW --> FIX[Fixture]
-  GW --> REF[Referee]
-  GW --> LIVE[Live Score]
-  GW --> STATS[Statistics]
-  GW --> NOTI[Notification]
-  GW --> ANA[Analytics]
+Flujo completo de un partido (README, fuente en `docs/diagramas/flujo-partido.mmd`):
 
-  FIX -- REST --> LEAGUE
-  FIX -- REST --> TEAM
-  TEAM -- REST --> LEAGUE
-  STATS -- REST --> LEAGUE
-  LIVE -- REST --> FIX
-  LIVE -- REST --> REF
-
-  BUS(("Redis Pub/Sub"))
-  FIX & LIVE & LEAGUE & AUTH & REF & STATS -. eventos .-> BUS
-  BUS -. eventos .-> REF & STATS & NOTI & FIX & LIVE
-
-  ANA -. réplicas de solo lectura .-> DBF[(fixture_db)] & DBL[(livescore_db)] & DBS[(statistics_db)]
-```
-
-Flujo completo de un partido (README):
-
-```mermaid
-sequenceDiagram
-  participant O as Organizador
-  participant F as Fixture
-  participant R as Referee
-  participant N as Notification
-  participant A as Árbitro (app)
-  participant G as API Gateway
-  participant L as Live Score
-  participant B as Redis Pub/Sub
-  participant S as Statistics
-  participant E as Espectadores (WS)
-
-  O->>G: POST /fixtures/{id}/publish
-  G->>F: (JWT validado)
-  F-->>B: fixture.published (una vez por jornada)
-  B-->>R: asigna árbitro (disponibilidad, zona, categoría)
-  R-->>B: referee.assigned
-  B-->>N: avisa al árbitro, al organizador y a los seguidores
-  A->>G: POST /matches/{id}/events (gol)
-  G->>L: permisos: ¿árbitro asignado? (consulta a Referee)
-  L-->>B: match.event
-  B-->>L: todas las réplicas difunden por WebSocket
-  L-->>E: marcador actualizado al instante
-  A->>G: POST /matches/{id}/complete
-  L-->>B: match.completed (acta v1)
-  B-->>S: recalcula la tabla (idempotente)
-  B-->>F: estado FINISHED
-  B-->>N: resultado final a equipos y aficionados
-```
+![Flujo completo de un partido](diagramas/flujo-partido.png)
 
 Arquitectura del documento del Momento 2 (M2, p. 3): «Todo pasa por el API Gateway y cada servicio
 guarda sus datos en su propia base».
@@ -615,7 +635,7 @@ la notificación del resultado final (sección 4.5, p. 23).*
 | CI/CD | GitHub Actions, GitHub Container Registry, gitleaks | M1, p. 26: GitHub Actions «garantiza que el código cumpla estándares de calidad, supere las pruebas definidas y pueda desplegarse de forma segura y automática»; GHCR, «lo que permite versionar imágenes y hacer rollback» |
 | Pruebas | Jest 29 (unitarias, integración y cobertura con Istanbul), k6 (carga) | M1, p. 26: k6 «simulando múltiples jornadas jugándose simultáneamente para validar el comportamiento del WebSocket bajo tráfico masivo» |
 | Calidad | ESLint 9 | M1, p. 25: «manteniendo un código consistente entre los ocho microservicios» |
-| Monitoreo | Prometheus 2.55, Grafana 11 (local) y Grafana Cloud (producción) | M1, p. 29: Grafana «con paneles segmentados por liga, categoría y temporada para facilitar el monitoreo en tiempo real durante una jornada» |
+| Monitoreo | Prometheus 2.55, Grafana 11 y Grafana Cloud | M1, p. 29: Grafana «con paneles segmentados por liga, categoría y temporada para facilitar el monitoreo en tiempo real durante una jornada» |
 | Despliegue | Render (microservicios, PostgreSQL y Redis) y Vercel (web), en planes gratuitos | M1, p. 26: Render despliega «mediante rolling updates… sin interrumpir el servicio»; p. 27: Vercel genera «un preview deployment para validar cambios antes de la fusión» |
 | Correo | Gmail a través de Google Apps Script | M2, p. 7: «debido a que Render Free bloquea el envío SMTP» |
 
@@ -624,14 +644,14 @@ la notificación del resultado final (sección 4.5, p. 23).*
 Qué se muestra en este momento:
 
 - **Pruebas:** la tabla de A.4 (dos unitarias con mocks y una de integración por servicio), la
-  ejecución en local, el CI en GitHub Actions y el informe de cobertura (capturas 10 a 12).
+  ejecución en local, el CI en GitHub Actions y el informe de cobertura (capturas 6 a 8).
 - **Despliegue:**
   - los YAML `ci.yml`, `deploy.yml` y `ci-servicio.yml`, explicados con la tabla de A.5;
-  - un cambio que dispara el pipeline hasta el despliegue (capturas 13 y 14), y la prueba fallida que no
-    llega a producción (capturas 15 y 16);
-  - la estrategia de ramas.
+  - el cambio que disparó el pipeline hasta el despliegue en Render (captura 9), y la prueba fallida
+    que no llega a producción (capturas 10 y 11);
+  - los secretos, la protección de `main` y la estrategia de ramas (capturas 12 y 13).
 - **Monitoreo:** Prometheus con los 10 targets en UP, el dashboard de Grafana con datos reales y las
-  métricas que muestra (capturas 19 a 23).
+  métricas que muestra (capturas 14 a 16).
 
 ### 5. Demostración funcional del proyecto
 
@@ -640,8 +660,7 @@ Qué se muestra en este momento:
 1. Unos minutos antes, despertar los servicios:
    `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\despertar.ps1`. Debe terminar con
    «Todo despierto».
-2. Si se va a mostrar el monitoreo, encender la recolección de Grafana Cloud y apagarla al terminar.
-3. Abrir dos navegadores, o uno normal y otro en privado, para tener dos sesiones a la vez.
+2. Abrir dos navegadores, o uno normal y otro en privado, para tener dos sesiones a la vez.
 
 **Evidencia del despliegue:** la web en https://sportsleague-cyan.vercel.app, la salida de
 `scripts/despertar.ps1` con los 10 servicios en `200` y *Administración → Sistema* con su estado.
@@ -706,9 +725,9 @@ demostración «Liga Amateur de Montería».
   3. Árbitro → *Iniciar partido* (`POST /api/v1/matches/:id/start`). Live Score pide el partido a
      Fixture y comprueba con Referee que Mario es el árbitro asignado, por REST. Publica
      `match.started` y Fixture pasa el partido a «en curso».
-  4. Árbitro → *+ Gol* de un equipo → jugador → *Registrar* (`POST /api/v1/matches/:id/events`). Live
-     Score publica `match.event` y lo difunde por WebSocket: el marcador cambia en la ventana del
-     aficionado sin recargar.
+  4. Árbitro → *Gol* en la columna de un equipo → jugador → *Registrar*
+     (`POST /api/v1/matches/:id/events`). Live Score publica `match.event` y lo difunde por WebSocket:
+     el marcador cambia en la ventana del aficionado sin recargar.
   5. Árbitro → *Finalizar partido* (`POST /api/v1/matches/:id/complete`). Live Score guarda el acta y
      publica `match.completed`: Fixture marca el partido como finalizado, Statistics recalcula la tabla
      con el reglamento que consulta a League y publica `standings.updated`, Notification avisa al
@@ -727,4 +746,5 @@ demostración «Liga Amateur de Montería».
 | Caso | Cómo provocarlo | Resultado esperado |
 |---|---|---|
 | Error: credenciales incorrectas | En `/login`, `aficionado@demo.com` con una contraseña equivocada, y después un correo que no existe | Auth Service responde `401` con el mismo mensaje en los dos casos, «Correo o contraseña incorrectos», para no revelar qué correos están registrados. La sesión no se abre |
+| Error: minuto fuera de rango | `organizador@demo.com` → *Control en vivo* del partido en vivo de la jornada 7 → *Gol* → *Registrar*, sin cambiar el minuto | La web calcula el minuto desde el inicio del partido, y ese partido se inició al cargar los datos de demostración, hace días. Live Score valida que el minuto esté entre 0 y 200 y responde `400`: el evento no se registra. Escribiendo el minuto a mano (por ejemplo, 70) se registra |
 | Caso alterno: jugador fuera del rango de edad | `organizador@demo.com` → *Mis ligas* → «Liga Amateur de Montería» → *Equipos* → fichar en un equipo un jugador menor de la edad mínima de la categoría (16 años) | Team Service consulta a League el rango de edad y el jugador queda *No elegible*: no puede jugar. Después se elimina desde la misma pantalla |

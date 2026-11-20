@@ -1,0 +1,45 @@
+erDiagram
+  notifications {
+    uuid id PK
+    uuid user_id
+    string email
+    string role
+    string type
+    string title
+    string body
+    string link
+    boolean read
+    string event_id
+    string dedupe_key UK
+    timestamp created_at
+  }
+  subscriptions {
+    uuid id PK
+    uuid user_id
+    string email
+    uuid league_id
+    timestamp created_at
+  }
+  preferences {
+    uuid user_id PK
+    boolean email_enabled
+    boolean push_enabled
+    timestamp updated_at
+  }
+  deliveries {
+    uuid id PK
+    string channel
+    string recipient
+    string subject
+    string status
+    timestamp created_at
+  }
+  push_subscriptions {
+    uuid id PK
+    uuid user_id
+    string endpoint UK
+    string p256dh
+    string auth
+    string user_agent
+    timestamp created_at
+  }

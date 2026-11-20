@@ -1,0 +1,30 @@
+erDiagram
+  teams {
+    uuid id PK
+    string name
+    uuid league_id
+    uuid category_id
+    uuid owner_id
+    uuid home_venue_id
+    string coach_name
+    string contact_email
+    string color
+    timestamp created_at
+    timestamp updated_at
+  }
+  players {
+    uuid id PK
+    uuid team_id FK
+    string first_name
+    string last_name
+    string document_id
+    timestamp birth_date
+    int jersey_number
+    string position
+    EligibilityStatus eligibility_status
+    string eligibility_note
+    string registration_doc_url
+    timestamp created_at
+    timestamp updated_at
+  }
+  teams ||--o{ players : "team"

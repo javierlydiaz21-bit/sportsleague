@@ -1,0 +1,30 @@
+erDiagram
+  live_matches {
+    uuid match_id PK
+    uuid league_id
+    uuid season_id
+    uuid category_id
+    uuid owner_id
+    uuid home_team_id
+    uuid away_team_id
+    LiveStatus status
+    timestamp started_at
+    timestamp finished_at
+    int attendance
+    int peak_viewers
+    string notes
+    int version
+  }
+  match_events {
+    uuid id PK
+    uuid match_id FK
+    EventType type
+    uuid team_id
+    uuid player_id
+    uuid player_in_id
+    int minute
+    int value
+    uuid created_by
+    timestamp created_at
+  }
+  live_matches ||--o{ match_events : "match"

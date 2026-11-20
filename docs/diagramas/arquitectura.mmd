@@ -1,0 +1,32 @@
+flowchart LR
+  subgraph Clientes
+    WEB["Web Next.js<br/>(organizadores, árbitros,<br/>aficionados, admin)"]
+    APP["App React Native (Expo)<br/>(árbitros y espectadores)"]
+  end
+  WEB -- HTTP --> GW["API Gateway<br/>JWT · rate limiting · CORS · logs"]
+  APP -- HTTP --> GW
+  WEB -. WebSocket .-> LIVE
+  APP -. WebSocket .-> LIVE
+
+  GW --> AUTH[Auth]
+  GW --> LEAGUE[League]
+  GW --> TEAM[Team]
+  GW --> FIX[Fixture]
+  GW --> REF[Referee]
+  GW --> LIVE[Live Score]
+  GW --> STATS[Statistics]
+  GW --> NOTI[Notification]
+  GW --> ANA[Analytics]
+
+  FIX -- REST --> LEAGUE
+  FIX -- REST --> TEAM
+  TEAM -- REST --> LEAGUE
+  STATS -- REST --> LEAGUE
+  LIVE -- REST --> FIX
+  LIVE -- REST --> REF
+
+  BUS(("Redis Pub/Sub"))
+  FIX & LIVE & LEAGUE & AUTH & REF & STATS -. eventos .-> BUS
+  BUS -. eventos .-> REF & STATS & NOTI & FIX & LIVE
+
+  ANA -. réplicas de solo lectura .-> DBF[(fixture_db)] & DBL[(livescore_db)] & DBS[(statistics_db)]
